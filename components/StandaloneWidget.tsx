@@ -59,8 +59,6 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   // Communicate with Parent Window (widget.js) to resize iframe
   useEffect(() => {
     const sendMessage = (open: boolean) => {
-        // We use '*' as targetOrigin because we might be embedded on any domain
-        // In a strict environment, we might want to restrict this.
         window.parent.postMessage({ type: 'nexus-resize', isOpen: open }, '*');
     };
     sendMessage(isOpen);
@@ -137,14 +135,15 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-screen text-zinc-500">Loading...</div>;
-  if (!chatbot) return <div className="flex items-center justify-center h-screen text-red-500 bg-zinc-950 p-4 text-center">Bot not found or DB error.</div>;
+  if (loading) return <div className="flex items-center justify-center h-screen text-zinc-500"></div>;
+  if (!chatbot) return <div className="flex items-center justify-center h-screen text-red-500 bg-zinc-950 p-4 text-center">Bot unavailable.</div>;
 
   // Main Layout
-  // If !isOpen, we just show the button in the corner (transparent background for the rest)
+  // If !isOpen, we just show the button. 
+  // Crucial: Removed padding and used center alignment to fit perfectly in the 80px iframe without scrollbars.
   if (!isOpen) {
     return (
-        <div className="w-full h-full flex items-end justify-end p-4 bg-transparent">
+        <div className="w-full h-full flex items-center justify-center bg-transparent">
             <button
                 onClick={() => setIsOpen(true)}
                 className="w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform duration-200"

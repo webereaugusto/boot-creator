@@ -24,8 +24,6 @@
 
     // Try to get Supabase creds from LocalStorage if testing on same domain, 
     // or assume they are passed via Env Vars in the app itself.
-    // For a robust production app, you wouldn't pass keys in URL, but relying on Vercel Env Vars.
-    // However, to ensure the iframe works if the user just set it up in the dashboard:
     let extraParams = '';
     try {
        const sbUrl = localStorage.getItem('sb_url');
@@ -39,7 +37,8 @@
     const iframe = document.createElement('iframe');
     iframe.src = `${appUrl}/?embed=true&botId=${botId}${extraParams}`;
     iframe.id = 'nexus-bot-iframe';
-    iframe.allow = "clipboard-read; clipboard-write"; // Allow copying text
+    iframe.setAttribute('scrolling', 'no'); // Force no scrolling attribute
+    iframe.allow = "clipboard-read; clipboard-write"; 
     
     // Styles for the Iframe (Start small - just the bubble)
     const style = iframe.style;
@@ -54,6 +53,7 @@
     style.transition = 'width 0.3s ease, height 0.3s ease, bottom 0.3s, right 0.3s';
     style.boxShadow = 'none'; 
     style.colorScheme = 'normal'; 
+    style.overflow = 'hidden'; // Force hidden in style
 
     document.body.appendChild(iframe);
 
@@ -98,6 +98,6 @@
     initWidget();
   } else {
     window.addEventListener('DOMContentLoaded', initWidget);
-    window.addEventListener('load', initWidget); // Fallback
+    window.addEventListener('load', initWidget); 
   }
 })();

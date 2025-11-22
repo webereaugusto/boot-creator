@@ -23,7 +23,9 @@ const App: React.FC = () => {
     if (isEmbed && botId) {
       setEmbedMode({ isEmbed: true, botId });
       // Add a specific class to body to make background transparent for the iframe
+      // IMPORTANT: Force overflow hidden to prevent scrollbars in the iframe
       document.body.style.backgroundColor = 'transparent';
+      document.body.style.setProperty('overflow', 'hidden', 'important');
     }
   }, []);
 
