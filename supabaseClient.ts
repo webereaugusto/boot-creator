@@ -11,9 +11,13 @@ export const getSupabase = () => {
     // Try to restore from local storage if not in memory
     const storedUrl = localStorage.getItem('sb_url');
     const storedKey = localStorage.getItem('sb_key');
+    
     if (storedUrl && storedKey) {
       try {
-        supabase = createClient(storedUrl, storedKey);
+        // Basic validation of the URL format to prevent crashes
+        if (storedUrl.startsWith('http')) {
+            supabase = createClient(storedUrl, storedKey);
+        }
       } catch (e) {
         console.error("Failed to restore Supabase client from local storage", e);
       }
@@ -24,6 +28,7 @@ export const getSupabase = () => {
 
 export const initSupabase = (url: string, key: string) => {
   try {
+    if (!url || !key) return false;
     supabase = createClient(url, key);
     // Persist connection details for this session/browser
     localStorage.setItem('sb_url', url);
@@ -41,10 +46,11 @@ if (supabaseUrl && supabaseAnonKey) {
 }
 
 export const SQL_SETUP_SCRIPT = `
--- Enable UUID extension (Required for gen_random_uuid())
+-- 1. Enable required extensions
+-- pgcrypto is required for gen_random_uuid()
 create extension if not exists "pgcrypto";
 
--- Create tables
+-- 2. Create Chatbots Table
 create table if not exists chatbots (
   id uuid default gen_random_uuid() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -56,6 +62,7 @@ create table if not exists chatbots (
   avatar_url text
 );
 
+-- 3. Create Sessions Table
 create table if not exists sessions (
   id uuid default gen_random_uuid() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -63,6 +70,7 @@ create table if not exists sessions (
   preview_text text
 );
 
+-- 4. Create Messages Table
 create table if not exists messages (
   id uuid default gen_random_uuid() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -72,12 +80,13 @@ create table if not exists messages (
   content text not null
 );
 
--- Enable Row Level Security
+-- 5. Enable Row Level Security (RLS)
 alter table chatbots enable row level security;
 alter table sessions enable row level security;
 alter table messages enable row level security;
 
--- Policy: Allow public access for this demo builder (WARNING: NOT FOR PRODUCTION)
+-- 6. Create Policies (Development Mode - Public Access)
+-- NOTE: For production, you should restrict these policies to authenticated users only.
 create policy "Public chatbots access" on chatbots for all using (true);
 create policy "Public sessions access" on sessions for all using (true);
 create policy "Public messages access" on messages for all using (true);

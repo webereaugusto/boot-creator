@@ -45,12 +45,16 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
 
   const handleSave = async () => {
     setErrorMsg(null);
+    
+    // Validation
     if (!formData.name) {
         setErrorMsg("Chatbot name is required.");
         return;
     }
+
+    // Check DB connection
     if (!supabase) {
-        setErrorMsg("Database not connected. Please go to Setup.");
+        setErrorMsg("Database not connected. Please go to 'Connection Settings' in the sidebar.");
         return;
     }
     
@@ -58,24 +62,35 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
 
     try {
       let error;
+      let data;
+
       if (botId) {
-        const result = await supabase.from('chatbots').update(formData).eq('id', botId);
+        // Update existing
+        const result = await supabase.from('chatbots').update(formData).eq('id', botId).select();
         error = result.error;
+        data = result.data;
       } else {
-        const result = await supabase.from('chatbots').insert([formData]).select();
+        // Insert new
+        // We strictly remove 'id' from formData if it exists to avoid conflicts during insert
+        const { id, ...insertData } = formData as any; 
+        const result = await supabase.from('chatbots').insert([insertData]).select();
         error = result.error;
+        data = result.data;
       }
 
       if (error) {
         console.error("Supabase Error:", error);
-        setErrorMsg(`Failed to save: ${error.message}. Did you run the SQL script?`);
+        // Show detailed error message
+        const details = error.message || JSON.stringify(error);
+        const hint = error.hint ? ` Hint: ${error.hint}` : '';
+        setErrorMsg(`Database Error: ${details}.${hint} (Have you run the Setup SQL script?)`);
       } else {
         // Success
         onNavigate(AppView.DASHBOARD);
       }
     } catch (e: any) {
       console.error("Unexpected Error:", e);
-      setErrorMsg(`An unexpected error occurred: ${e.message}`);
+      setErrorMsg(`An unexpected error occurred: ${e.message || e}`);
     } finally {
       setLoading(false);
     }
@@ -151,11 +166,11 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
           <div className="max-w-3xl mx-auto">
             
             {errorMsg && (
-                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3">
+                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3 animate-in slide-in-from-top-2">
                     <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
-                    <div>
-                        <h4 className="text-red-500 font-medium text-sm">Error</h4>
-                        <p className="text-red-400 text-sm opacity-90">{errorMsg}</p>
+                    <div className="flex-1">
+                        <h4 className="text-red-500 font-medium text-sm">Error Saving Chatbot</h4>
+                        <p className="text-red-400 text-xs font-mono mt-1 opacity-90 break-words">{errorMsg}</p>
                     </div>
                 </div>
             )}
