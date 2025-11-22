@@ -1,0 +1,5 @@
+{
+  "name": "NexusBot Builder",
+  "description": "A modern, dark-themed platform to build, manage, and embed AI chatbots. Features Supabase integration for storage and a visual dashboard.",
+  "requestFramePermissions": []
+}
