@@ -99,3 +99,5 @@
   } else {
     window.addEventListener('DOMContentLoaded', initWidget);
     window.addEventListener('load', initWidget); 
+  }
+})();
