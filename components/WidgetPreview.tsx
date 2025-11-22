@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, X, Minus, Bot, User } from 'lucide-react';
+import { MessageSquare, Send, X, Minus, Bot } from 'lucide-react';
 import { Chatbot, Message } from '../types';
 import { simulateChatResponse } from '../services/geminiService';
 import { getSupabase } from '../supabaseClient';
@@ -55,34 +55,37 @@ export const WidgetPreview: React.FC<WidgetPreviewProps> = ({ chatbot }) => {
     setInputValue('');
     setIsTyping(true);
 
-    // Save to Supabase if configured
+    // Save to Supabase if configured (Preview Mode)
     const supabase = getSupabase();
     let currentSessionId = sessionId;
 
     if (supabase) {
-      if (!currentSessionId) {
-        const { data: session } = await supabase.from('sessions').insert({
-          chatbot_id: chatbot.id,
-          preview_text: userMsg.content.substring(0, 50)
-        }).select().single();
-        if (session) {
-          currentSessionId = session.id;
-          setSessionId(session.id);
+      try {
+        if (!currentSessionId) {
+            const { data: session } = await supabase.from('sessions').insert({
+            chatbot_id: chatbot.id,
+            preview_text: userMsg.content.substring(0, 50)
+            }).select().single();
+            if (session) {
+            currentSessionId = session.id;
+            setSessionId(session.id);
+            }
         }
-      }
 
-      if (currentSessionId) {
-         await supabase.from('messages').insert({
-           chatbot_id: chatbot.id,
-           session_id: currentSessionId,
-           role: 'user',
-           content: userMsg.content
-         });
+        if (currentSessionId) {
+            await supabase.from('messages').insert({
+            chatbot_id: chatbot.id,
+            session_id: currentSessionId,
+            role: 'user',
+            content: userMsg.content
+            });
+        }
+      } catch(e) {
+          // Ignore errors in preview mode
       }
     }
 
     // Simulate AI Response
-    // In production, this would call your backend which uses the stored OpenAI Key
     const responseText = await simulateChatResponse(
         [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
         chatbot.role_definition,
@@ -102,12 +105,14 @@ export const WidgetPreview: React.FC<WidgetPreviewProps> = ({ chatbot }) => {
     setIsTyping(false);
 
     if (supabase && currentSessionId) {
-       await supabase.from('messages').insert({
-           chatbot_id: chatbot.id,
-           session_id: currentSessionId,
-           role: 'assistant',
-           content: aiMsg.content
-         });
+       try {
+        await supabase.from('messages').insert({
+            chatbot_id: chatbot.id,
+            session_id: currentSessionId,
+            role: 'assistant',
+            content: aiMsg.content
+            });
+       } catch(e) {}
     }
   };
 

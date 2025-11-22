@@ -71,7 +71,6 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
         data = result.data;
       } else {
         // Insert new
-        // We strictly remove 'id' from formData if it exists to avoid conflicts during insert
         const { id, ...insertData } = formData as any; 
         const result = await supabase.from('chatbots').insert([insertData]).select();
         error = result.error;
@@ -80,13 +79,16 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
 
       if (error) {
         console.error("Supabase Error:", error);
-        // Show detailed error message
         const details = error.message || JSON.stringify(error);
         const hint = error.hint ? ` Hint: ${error.hint}` : '';
         setErrorMsg(`Database Error: ${details}.${hint} (Have you run the Setup SQL script?)`);
       } else {
-        // Success
-        onNavigate(AppView.DASHBOARD);
+        if (data && data[0]?.id && !botId) {
+             // If newly created, switch to update mode with the new ID
+             onNavigate(AppView.DASHBOARD); 
+        } else {
+             onNavigate(AppView.DASHBOARD);
+        }
       }
     } catch (e: any) {
       console.error("Unexpected Error:", e);
@@ -109,13 +111,22 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
     setGenerating(false);
   };
 
+  // Generate script using the current origin so it works on Vercel
+  const currentOrigin = window.location.origin;
   const embedCode = `<script>
   window.nexusBotId = "${botId || 'YOUR_BOT_ID'}";
   (function() {
     var script = document.createElement("script");
-    script.src = "https://cdn.nexusbot.app/widget.js"; 
+    script.src = "${currentOrigin}/widget.js"; 
     script.async = true;
-    document.body.appendChild(script);
+    // Safe append that works even if placed in <head>
+    if (document.body) {
+       document.body.appendChild(script);
+    } else {
+       document.addEventListener('DOMContentLoaded', function() {
+          document.body.appendChild(script);
+       });
+    }
   })();
 </script>`;
 
@@ -271,8 +282,7 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
                   <section className="bg-surface border border-zinc-800 rounded-xl p-6">
                      <h3 className="text-lg font-medium text-white mb-4">Installation</h3>
                      <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
-                        Copy the code below and paste it into the <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded text-xs">{`<body>`}</code> of your website. 
-                        The widget will appear in the bottom-right corner automatically.
+                        Copy the code below and paste it anywhere in the <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded text-xs">{`<body>`}</code> of your website.
                      </p>
                      
                      <div className="relative group">
@@ -292,6 +302,9 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
                             <Copy size={16} />
                         </button>
                      </div>
+                     <div className="mt-4 p-4 bg-blue-500/10 text-blue-400 text-xs rounded-lg border border-blue-500/20">
+                        <strong>Tip:</strong> Since this is a preview deployment, make sure you are viewing this dashboard on the same domain where you want to host the widget script (e.g. Vercel), otherwise the `script.src` might point to localhost.
+                     </div>
                   </section>
               </div>
             )}
@@ -301,7 +314,7 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
       </div>
 
       {/* Live Preview Overlay (Simulated) */}
-      {formData.name && (
+      {formData.name && activeTab === 'config' && (
          <WidgetPreview chatbot={formData as Chatbot} />
       )}
     </div>

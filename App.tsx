@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bot, Settings, BarChart3, HelpCircle } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { BotEditor } from './components/BotEditor';
 import { Setup } from './components/Setup';
 import { SqlModal } from './components/SqlModal';
+import { StandaloneWidget } from './components/StandaloneWidget';
 import { AppView } from './types';
 import { getSupabase } from './supabaseClient';
 
@@ -11,15 +12,32 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [selectedBotId, setSelectedBotId] = useState<string | undefined>(undefined);
   const [showSqlModal, setShowSqlModal] = useState(false);
+  const [embedMode, setEmbedMode] = useState<{isEmbed: boolean, botId: string | null}>({isEmbed: false, botId: null});
+
+  useEffect(() => {
+    // Simple router for embed mode
+    const params = new URLSearchParams(window.location.search);
+    const isEmbed = params.get('embed') === 'true';
+    const botId = params.get('botId');
+
+    if (isEmbed && botId) {
+      setEmbedMode({ isEmbed: true, botId });
+      // Add a specific class to body to make background transparent for the iframe
+      document.body.style.backgroundColor = 'transparent';
+    }
+  }, []);
 
   const navigate = (view: AppView, botId?: string) => {
     setSelectedBotId(botId);
     setCurrentView(view);
   };
 
-  // If no supabase client is active, maybe default to setup or allow viewing dashboard in empty state
-  // We'll handle that in the Dashboard component itself.
+  // RENDER STANDALONE WIDGET
+  if (embedMode.isEmbed && embedMode.botId) {
+    return <StandaloneWidget botId={embedMode.botId} />;
+  }
 
+  // NORMAL APP RENDER
   const renderContent = () => {
     switch (currentView) {
       case AppView.DASHBOARD:
