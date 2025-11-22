@@ -111,22 +111,19 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
     setGenerating(false);
   };
 
-  // Generate script using the current origin so it works on Vercel
+  // Generate robust script
+  // Uses current origin for Vercel support
+  // Appends to head if body is missing to avoid errors
   const currentOrigin = window.location.origin;
   const embedCode = `<script>
   window.nexusBotId = "${botId || 'YOUR_BOT_ID'}";
   (function() {
-    var script = document.createElement("script");
-    script.src = "${currentOrigin}/widget.js"; 
-    script.async = true;
-    // Safe append that works even if placed in <head>
-    if (document.body) {
-       document.body.appendChild(script);
-    } else {
-       document.addEventListener('DOMContentLoaded', function() {
-          document.body.appendChild(script);
-       });
-    }
+    var d = document, s = d.createElement("script");
+    s.src = "${currentOrigin}/widget.js";
+    s.async = true;
+    // Insert before closing body or append to head if body not yet ready
+    var target = d.getElementsByTagName("body")[0] || d.getElementsByTagName("head")[0];
+    target.appendChild(s);
   })();
 </script>`;
 
@@ -262,16 +259,16 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
                         </div>
 
                         <div className="space-y-2 pt-4 border-t border-zinc-800/50">
-                            <label className="text-sm text-zinc-400 font-medium">OpenAI API Key (or other Provider)</label>
+                            <label className="text-sm text-zinc-400 font-medium">OpenAI/Gemini API Key</label>
                             <input 
                                 type="password" 
                                 className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none font-mono text-sm focus:ring-1 focus:ring-primary/50 transition"
-                                placeholder="sk-..."
+                                placeholder="Leave blank to use global key if configured in Vercel"
                                 value={formData.api_key}
                                 onChange={e => setFormData({...formData, api_key: e.target.value})}
                             />
                             <p className="text-xs text-zinc-500">
-                                This key is used by the bot to generate responses.
+                                Required for the bot to reply. If not set here, the system global key is used.
                             </p>
                         </div>
                    </div>
@@ -282,7 +279,7 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
                   <section className="bg-surface border border-zinc-800 rounded-xl p-6">
                      <h3 className="text-lg font-medium text-white mb-4">Installation</h3>
                      <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
-                        Copy the code below and paste it anywhere in the <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded text-xs">{`<body>`}</code> of your website.
+                        Copy the code below and paste it into the <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded text-xs">&lt;body&gt;</code> or <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded text-xs">&lt;head&gt;</code> of your website.
                      </p>
                      
                      <div className="relative group">
@@ -303,7 +300,7 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
                         </button>
                      </div>
                      <div className="mt-4 p-4 bg-blue-500/10 text-blue-400 text-xs rounded-lg border border-blue-500/20">
-                        <strong>Tip:</strong> Since this is a preview deployment, make sure you are viewing this dashboard on the same domain where you want to host the widget script (e.g. Vercel), otherwise the `script.src` might point to localhost.
+                        <strong>Note:</strong> Ensure you have redeployed your application to Vercel for these changes to take effect. The script URL above should match your Vercel domain, not <code>cdn.nexusbot.app</code>.
                      </div>
                   </section>
               </div>

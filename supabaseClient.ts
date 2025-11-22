@@ -8,13 +8,34 @@ let supabase: SupabaseClient | null = null;
 
 export const getSupabase = () => {
   if (!supabase) {
-    // Try to restore from local storage if not in memory
+    // 1. Try Environment Variables (Preferred)
+    if (supabaseUrl && supabaseAnonKey) {
+       try {
+         supabase = createClient(supabaseUrl, supabaseAnonKey);
+         return supabase;
+       } catch(e) {}
+    }
+
+    // 2. Try URL Parameters (For Iframe embedding)
+    // This allows the parent setup to pass creds to the embedded widget safely via URL
+    if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const urlParam = params.get('sbUrl');
+        const keyParam = params.get('sbKey');
+        if (urlParam && keyParam) {
+            try {
+                supabase = createClient(urlParam, keyParam);
+                return supabase;
+            } catch(e) {}
+        }
+    }
+
+    // 3. Try Local Storage (For Dashboard User)
     const storedUrl = localStorage.getItem('sb_url');
     const storedKey = localStorage.getItem('sb_key');
     
     if (storedUrl && storedKey) {
       try {
-        // Basic validation of the URL format to prevent crashes
         if (storedUrl.startsWith('http')) {
             supabase = createClient(storedUrl, storedKey);
         }
@@ -40,7 +61,7 @@ export const initSupabase = (url: string, key: string) => {
   }
 };
 
-// Attempt auto-init if env vars exist
+// Attempt auto-init
 if (supabaseUrl && supabaseAnonKey) {
   initSupabase(supabaseUrl, supabaseAnonKey);
 }

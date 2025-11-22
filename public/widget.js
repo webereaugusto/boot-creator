@@ -4,7 +4,6 @@
     if (document.getElementById('nexus-bot-iframe')) return;
 
     // Get the script element to extract the base URL
-    // This allows the widget.js to know where to point the iframe (the vercel app url)
     const scriptTag = document.currentScript || document.querySelector('script[src*="widget.js"]');
     let appUrl = 'https://boot-creator.vercel.app'; // Fallback
     
@@ -23,10 +22,24 @@
       return;
     }
 
+    // Try to get Supabase creds from LocalStorage if testing on same domain, 
+    // or assume they are passed via Env Vars in the app itself.
+    // For a robust production app, you wouldn't pass keys in URL, but relying on Vercel Env Vars.
+    // However, to ensure the iframe works if the user just set it up in the dashboard:
+    let extraParams = '';
+    try {
+       const sbUrl = localStorage.getItem('sb_url');
+       const sbKey = localStorage.getItem('sb_key');
+       if (sbUrl && sbKey) {
+           extraParams = `&sbUrl=${encodeURIComponent(sbUrl)}&sbKey=${encodeURIComponent(sbKey)}`;
+       }
+    } catch(e) {}
+
     // Create Iframe
     const iframe = document.createElement('iframe');
-    iframe.src = `${appUrl}/?embed=true&botId=${botId}`;
+    iframe.src = `${appUrl}/?embed=true&botId=${botId}${extraParams}`;
     iframe.id = 'nexus-bot-iframe';
+    iframe.allow = "clipboard-read; clipboard-write"; // Allow copying text
     
     // Styles for the Iframe (Start small - just the bubble)
     const style = iframe.style;
@@ -36,52 +49,55 @@
     style.width = '80px'; 
     style.height = '80px';
     style.border = 'none';
-    style.zIndex = '999999';
+    style.zIndex = '2147483647'; // Max Z-Index
     style.borderRadius = '10px';
     style.transition = 'width 0.3s ease, height 0.3s ease, bottom 0.3s, right 0.3s';
-    style.boxShadow = 'none'; // Shadow handled inside iframe
-    style.colorScheme = 'normal'; // Prevent site dark mode from affecting iframe scrollbars
+    style.boxShadow = 'none'; 
+    style.colorScheme = 'normal'; 
 
     document.body.appendChild(iframe);
 
-    // Listen for resize messages from the React App inside the iframe
+    // Listen for resize messages
     window.addEventListener('message', (event) => {
-      // Security check: ensure message comes from our app
+      // Security check
       if (event.origin !== appUrl) return;
 
       if (event.data.type === 'nexus-resize') {
         if (event.data.isOpen) {
           // Open State
           if (window.innerWidth < 640) {
-             // Mobile: Full screen
+             // Mobile
              style.width = '100%';
              style.height = '100%';
              style.bottom = '0';
              style.right = '0';
              style.borderRadius = '0';
           } else {
-             // Desktop: Popover size
+             // Desktop
              style.width = '380px';
              style.height = '650px';
              style.maxHeight = '90vh';
              style.borderRadius = '16px';
+             style.boxShadow = '0 20px 50px rgba(0,0,0,0.25)';
           }
         } else {
-          // Closed State (Bubble only)
+          // Closed State
           style.width = '80px';
           style.height = '80px';
           style.bottom = '20px';
           style.right = '20px';
           style.borderRadius = '10px';
+          style.boxShadow = 'none';
         }
       }
     });
   }
 
-  // Ensure body exists before appending
+  // Safe loader
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
     initWidget();
   } else {
-    document.addEventListener('DOMContentLoaded', initWidget);
+    window.addEventListener('DOMContentLoaded', initWidget);
+    window.addEventListener('load', initWidget); // Fallback
   }
 })();
