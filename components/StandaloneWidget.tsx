@@ -139,8 +139,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   if (!chatbot) return <div className="flex items-center justify-center h-screen text-red-500 bg-zinc-950 p-4 text-center">Bot unavailable.</div>;
 
   // Main Layout
-  // If !isOpen, we just show the button. 
-  // Crucial: Removed padding and used center alignment to fit perfectly in the 80px iframe without scrollbars.
+  
   if (!isOpen) {
     return (
         <div className="w-full h-full flex items-center justify-center bg-transparent">
@@ -156,8 +155,10 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   }
 
   // Open State
+  // CHANGED: Removed rounded-lg, shadow-2xl, border from here. 
+  // The Iframe in widget.js handles the "Window" frame. We just fill it.
   return (
-    <div className="w-full h-full flex flex-col bg-surface rounded-lg overflow-hidden shadow-2xl border border-zinc-800/50">
+    <div className="w-full h-full flex flex-col bg-surface">
       {/* Header */}
       <div 
         className="p-4 flex items-center justify-between text-white shrink-0"

@@ -78,7 +78,7 @@
              style.height = '650px';
              style.maxHeight = '90vh';
              style.borderRadius = '16px';
-             style.boxShadow = '0 20px 50px rgba(0,0,0,0.25)';
+             style.boxShadow = '0 12px 40px rgba(0,0,0,0.3)'; // Shadow on Iframe
           }
         } else {
           // Closed State
@@ -99,5 +99,3 @@
   } else {
     window.addEventListener('DOMContentLoaded', initWidget);
     window.addEventListener('load', initWidget); 
-  }
-})();
