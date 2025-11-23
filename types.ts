@@ -29,7 +29,8 @@ export enum AppView {
   DASHBOARD = 'DASHBOARD',
   EDITOR = 'EDITOR',
   ANALYTICS = 'ANALYTICS',
-  SETUP = 'SETUP'
+  SETUP = 'SETUP',
+  HISTORY = 'HISTORY'
 }
 
 // For Gemini Role Generation

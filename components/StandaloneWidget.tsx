@@ -20,24 +20,45 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const supabase = getSupabase();
 
-  // Load Bot Data
+  // Load Bot Data & Restore Session
   useEffect(() => {
-    const loadBot = async () => {
+    const init = async () => {
       if (!supabase) {
           setLoading(false);
           return;
       }
-      const { data, error } = await supabase.from('chatbots').select('*').eq('id', botId).single();
+
+      // 1. Load Bot Profile
+      const { data: botData, error } = await supabase.from('chatbots').select('*').eq('id', botId).single();
       if (error) console.error("Error loading bot:", error);
-      if (data) setChatbot(data);
+      if (botData) setChatbot(botData);
+
+      // 2. Check for existing session in LocalStorage
+      const storageKey = `nexus_session_${botId}`;
+      const savedSessionId = localStorage.getItem(storageKey);
+
+      if (savedSessionId) {
+        setSessionId(savedSessionId);
+        // Load history
+        const { data: history } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('session_id', savedSessionId)
+          .order('created_at', { ascending: true });
+        
+        if (history && history.length > 0) {
+          setMessages(history);
+        }
+      }
+
       setLoading(false);
     };
-    loadBot();
+    init();
   }, [botId, supabase]);
 
-  // Initial Greeting
+  // Initial Greeting (Only if no messages exist)
   useEffect(() => {
-    if (isOpen && messages.length === 0 && chatbot) {
+    if (isOpen && messages.length === 0 && chatbot && !loading) {
       setMessages([
         {
           id: 'welcome',
@@ -49,14 +70,14 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
         }
       ]);
     }
-  }, [isOpen, chatbot, messages.length]);
+  }, [isOpen, chatbot, messages.length, loading]);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping, isOpen]);
 
-  // Communicate with Parent Window (widget.js) to resize iframe
+  // Communicate with Parent Window
   useEffect(() => {
     const sendMessage = (open: boolean) => {
         window.parent.postMessage({ type: 'nexus-resize', isOpen: open }, '*');
@@ -85,6 +106,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     if (supabase) {
       try {
         if (!currentSessionId) {
+            // Create new session
             const { data: session } = await supabase.from('sessions').insert({
                 chatbot_id: chatbot.id,
                 preview_text: userMsg.content.substring(0, 50)
@@ -93,6 +115,8 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
             if (session) {
                 currentSessionId = session.id;
                 setSessionId(session.id);
+                // Persist to LocalStorage
+                localStorage.setItem(`nexus_session_${botId}`, session.id);
             }
         }
 
@@ -132,14 +156,15 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
             role: 'assistant',
             content: aiMsg.content
         });
+        
+        // Update session preview text (optional, keeps dashboard fresh)
+        // await supabase.from('sessions').update({ preview_text: userMsg.content.substring(0, 50) }).eq('id', currentSessionId);
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-screen text-zinc-500"></div>;
+  if (loading) return <div className="flex items-center justify-center h-screen text-zinc-500 bg-transparent"></div>;
   if (!chatbot) return <div className="flex items-center justify-center h-screen text-red-500 bg-zinc-950 p-4 text-center">Bot unavailable.</div>;
 
-  // Main Layout
-  
   if (!isOpen) {
     return (
         <div className="w-full h-full flex items-center justify-center bg-transparent">
@@ -154,9 +179,6 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     );
   }
 
-  // Open State
-  // CHANGED: Removed rounded-lg, shadow-2xl, border from here. 
-  // The Iframe in widget.js handles the "Window" frame. We just fill it.
   return (
     <div className="w-full h-full flex flex-col bg-surface">
       {/* Header */}

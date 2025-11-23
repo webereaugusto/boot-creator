@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bot, Settings, BarChart3, HelpCircle } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { BotEditor } from './components/BotEditor';
+import { ChatHistory } from './components/ChatHistory';
 import { Setup } from './components/Setup';
 import { SqlModal } from './components/SqlModal';
 import { StandaloneWidget } from './components/StandaloneWidget';
@@ -46,6 +47,8 @@ const App: React.FC = () => {
         return <Dashboard onNavigate={navigate} />;
       case AppView.EDITOR:
         return <BotEditor botId={selectedBotId} onNavigate={navigate} />;
+      case AppView.HISTORY:
+        return selectedBotId ? <ChatHistory botId={selectedBotId} onNavigate={navigate} /> : <Dashboard onNavigate={navigate} />;
       case AppView.SETUP:
         return <Setup onNavigate={navigate} />;
       case AppView.ANALYTICS:

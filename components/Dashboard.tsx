@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, MessageSquare, Trash2, Code, Terminal } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, Code, Terminal, Inbox } from 'lucide-react';
 import { Chatbot, AppView } from '../types';
 import { getSupabase } from '../supabaseClient';
 
@@ -83,7 +83,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div 
               key={bot.id} 
               onClick={() => onNavigate(AppView.EDITOR, bot.id)}
-              className="group bg-surface border border-zinc-800 rounded-xl p-6 hover:border-primary/50 transition cursor-pointer relative overflow-hidden"
+              className="group bg-surface border border-zinc-800 rounded-xl p-6 hover:border-primary/50 transition cursor-pointer relative overflow-hidden flex flex-col"
             >
               <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: bot.theme_color }}></div>
               
@@ -106,9 +106,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 {bot.role_definition || 'No role defined.'}
               </p>
 
-              <div className="flex items-center gap-2 text-xs text-zinc-500 mt-auto pt-4 border-t border-zinc-800/50">
-                 <Code size={14} />
-                 <span>Embed ID: {bot.id.slice(0, 8)}...</span>
+              <div className="mt-auto pt-4 border-t border-zinc-800/50 flex items-center justify-between">
+                 <div className="flex items-center gap-2 text-xs text-zinc-500">
+                    <Code size={14} />
+                    <span>ID: {bot.id.slice(0, 4)}...</span>
+                 </div>
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); onNavigate(AppView.HISTORY, bot.id); }}
+                    className="flex items-center gap-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-md transition"
+                 >
+                    <Inbox size={14} /> History
+                 </button>
               </div>
             </div>
           ))}
