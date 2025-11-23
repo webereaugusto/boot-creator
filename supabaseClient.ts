@@ -80,7 +80,8 @@ create table if not exists chatbots (
   knowledge_base text,
   api_key text,
   theme_color text default '#3b82f6',
-  avatar_url text
+  avatar_url text,
+  lead_config jsonb default '{"enabled": false}'::jsonb
 );
 
 -- 3. Create Sessions Table
@@ -89,7 +90,8 @@ create table if not exists sessions (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   chatbot_id uuid references chatbots(id) on delete cascade,
   preview_text text,
-  origin_url text
+  origin_url text,
+  user_data jsonb
 );
 
 -- 4. Create Messages Table

@@ -17,6 +17,10 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
+  // Lead Gen State
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [leadData, setLeadData] = useState<Record<string, string>>({});
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const supabase = getSupabase();
 
@@ -31,34 +35,43 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
       // 1. Load Bot Profile
       const { data: botData, error } = await supabase.from('chatbots').select('*').eq('id', botId).single();
       if (error) console.error("Error loading bot:", error);
-      if (botData) setChatbot(botData);
+      
+      if (botData) {
+        setChatbot(botData);
+        // Initialize logic for lead form
+        const storageKey = `nexus_session_${botId}`;
+        const savedSessionId = localStorage.getItem(storageKey);
 
-      // 2. Check for existing session in LocalStorage
-      const storageKey = `nexus_session_${botId}`;
-      const savedSessionId = localStorage.getItem(storageKey);
-
-      if (savedSessionId) {
-        setSessionId(savedSessionId);
-        // Load history
-        const { data: history } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('session_id', savedSessionId)
-          .order('created_at', { ascending: true });
-        
-        if (history && history.length > 0) {
-          setMessages(history);
+        if (savedSessionId) {
+            // If session exists, skip form
+            setSessionId(savedSessionId);
+            const { data: history } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('session_id', savedSessionId)
+            .order('created_at', { ascending: true });
+            
+            if (history && history.length > 0) {
+                setMessages(history);
+            }
+            setShowLeadForm(false);
+        } else {
+            // No session, check if lead form is enabled
+            if (botData.lead_config?.enabled) {
+                setShowLeadForm(true);
+            } else {
+                setShowLeadForm(false);
+            }
         }
       }
-
       setLoading(false);
     };
     init();
   }, [botId, supabase]);
 
-  // Initial Greeting (Only if no messages exist)
+  // Initial Greeting (Only if no messages exist and not showing form)
   useEffect(() => {
-    if (isOpen && messages.length === 0 && chatbot && !loading) {
+    if (isOpen && !showLeadForm && messages.length === 0 && chatbot && !loading) {
       setMessages([
         {
           id: 'welcome',
@@ -70,12 +83,12 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
         }
       ]);
     }
-  }, [isOpen, chatbot, messages.length, loading]);
+  }, [isOpen, showLeadForm, chatbot, messages.length, loading]);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping, isOpen]);
+  }, [messages, isTyping, isOpen, showLeadForm]);
 
   // Communicate with Parent Window
   useEffect(() => {
@@ -84,6 +97,33 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     };
     sendMessage(isOpen);
   }, [isOpen]);
+
+  const handleLeadSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      // Create session immediately with the lead data
+      if (supabase && chatbot) {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const originUrl = params.get('origin');
+
+            const { data: session } = await supabase.from('sessions').insert({
+                chatbot_id: chatbot.id,
+                preview_text: 'Lead Form Submitted',
+                origin_url: originUrl || undefined,
+                user_data: leadData
+            }).select().single();
+
+            if (session) {
+                setSessionId(session.id);
+                localStorage.setItem(`nexus_session_${botId}`, session.id);
+            }
+        } catch (error) {
+            console.error("Failed to create session with lead data", error);
+        }
+      }
+      setShowLeadForm(false);
+  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || !chatbot) return;
@@ -106,11 +146,10 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     if (supabase) {
       try {
         if (!currentSessionId) {
-            // Get origin from URL params
+            // Just in case we didn't create it in lead form (e.g. lead form disabled)
             const params = new URLSearchParams(window.location.search);
             const originUrl = params.get('origin');
 
-            // Create new session
             const { data: session } = await supabase.from('sessions').insert({
                 chatbot_id: chatbot.id,
                 preview_text: userMsg.content.substring(0, 50),
@@ -120,7 +159,6 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
             if (session) {
                 currentSessionId = session.id;
                 setSessionId(session.id);
-                // Persist to LocalStorage
                 localStorage.setItem(`nexus_session_${botId}`, session.id);
             }
         }
@@ -162,8 +200,8 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
             content: aiMsg.content
         });
         
-        // Update session preview text (optional, keeps dashboard fresh)
-        // await supabase.from('sessions').update({ preview_text: userMsg.content.substring(0, 50) }).eq('id', currentSessionId);
+        // Update session preview text
+        await supabase.from('sessions').update({ preview_text: userMsg.content.substring(0, 50) }).eq('id', currentSessionId);
     }
   };
 
@@ -205,63 +243,128 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
         </button>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 bg-zinc-950/50 p-4 overflow-y-auto space-y-4">
-        {messages.map((msg) => (
-            <div 
-            key={msg.id} 
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-            <div 
-                className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                msg.role === 'user' 
-                    ? 'text-white rounded-br-sm' 
-                    : 'bg-secondary text-zinc-200 rounded-bl-sm'
-                }`}
-                style={msg.role === 'user' ? { backgroundColor: chatbot.theme_color } : {}}
-            >
-                {msg.content}
+      {showLeadForm ? (
+          <div className="flex-1 bg-zinc-950 p-8 flex flex-col justify-center animate-in fade-in">
+             <div className="text-center mb-6">
+                <h3 className="text-white font-semibold text-lg">Welcome</h3>
+                <p className="text-zinc-400 text-sm mt-1">Please fill in your details to start chatting.</p>
+             </div>
+             
+             <form onSubmit={handleLeadSubmit} className="space-y-4">
+                 {chatbot.lead_config?.nameRequired && (
+                     <div>
+                        <label className="text-xs text-zinc-500 font-medium ml-1">Name</label>
+                        <input 
+                            type="text" 
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" 
+                            required 
+                            onChange={e => setLeadData({...leadData, Name: e.target.value})}
+                        />
+                     </div>
+                 )}
+                 {chatbot.lead_config?.emailRequired && (
+                     <div>
+                        <label className="text-xs text-zinc-500 font-medium ml-1">Email</label>
+                        <input 
+                            type="email" 
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" 
+                            required 
+                            onChange={e => setLeadData({...leadData, Email: e.target.value})}
+                        />
+                     </div>
+                 )}
+                 {chatbot.lead_config?.phoneRequired && (
+                     <div>
+                        <label className="text-xs text-zinc-500 font-medium ml-1">Phone</label>
+                        <input 
+                            type="tel" 
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" 
+                            required 
+                            onChange={e => setLeadData({...leadData, Phone: e.target.value})}
+                        />
+                     </div>
+                 )}
+                 {chatbot.lead_config?.customField && (
+                     <div>
+                        <label className="text-xs text-zinc-500 font-medium ml-1">{chatbot.lead_config.customField}</label>
+                        <input 
+                            type="text" 
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" 
+                            required 
+                            onChange={e => setLeadData({...leadData, [chatbot.lead_config!.customField!]: e.target.value})}
+                        />
+                     </div>
+                 )}
+                 <button 
+                     type="submit" 
+                     className="w-full py-3 rounded-lg text-white font-medium mt-4 hover:opacity-90 transition"
+                     style={{ backgroundColor: chatbot.theme_color || '#3b82f6' }}
+                 >
+                     Start Chat
+                 </button>
+             </form>
+          </div>
+      ) : (
+        <>
+            {/* Messages Area */}
+            <div className="flex-1 bg-zinc-950/50 p-4 overflow-y-auto space-y-4">
+                {messages.map((msg) => (
+                    <div 
+                    key={msg.id} 
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                    <div 
+                        className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                        msg.role === 'user' 
+                            ? 'text-white rounded-br-sm' 
+                            : 'bg-secondary text-zinc-200 rounded-bl-sm'
+                        }`}
+                        style={msg.role === 'user' ? { backgroundColor: chatbot.theme_color } : {}}
+                    >
+                        {msg.content}
+                    </div>
+                    </div>
+                ))}
+                {isTyping && (
+                    <div className="flex justify-start">
+                    <div className="bg-secondary px-4 py-3 rounded-2xl rounded-bl-sm flex gap-1">
+                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
+                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce delay-75"></span>
+                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce delay-150"></span>
+                    </div>
+                    </div>
+                )}
+                <div ref={messagesEndRef} />
             </div>
-            </div>
-        ))}
-        {isTyping && (
-            <div className="flex justify-start">
-            <div className="bg-secondary px-4 py-3 rounded-2xl rounded-bl-sm flex gap-1">
-                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
-                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce delay-75"></span>
-                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce delay-150"></span>
-            </div>
-            </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
 
-      {/* Input Area */}
-      <div className="p-3 bg-surface border-t border-zinc-800 shrink-0">
-        <form 
-            onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
-            className="flex items-center gap-2"
-        >
-            <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-full px-4 py-2 text-sm text-white focus:outline-none focus:border-primary transition"
-            />
-            <button 
-            type="submit"
-            disabled={!inputValue.trim()}
-            className="p-2 rounded-full bg-zinc-800 hover:bg-zinc-700 transition disabled:opacity-50 text-white"
-            style={{ color: chatbot.theme_color }}
-            >
-            <Send size={18} />
-            </button>
-        </form>
-        <div className="mt-2 text-center">
-             <a href="#" className="text-[10px] text-zinc-600 hover:text-zinc-500 transition">Powered by NexusBot</a>
-        </div>
-      </div>
+            {/* Input Area */}
+            <div className="p-3 bg-surface border-t border-zinc-800 shrink-0">
+                <form 
+                    onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                    className="flex items-center gap-2"
+                >
+                    <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 bg-zinc-900 border border-zinc-700 rounded-full px-4 py-2 text-sm text-white focus:outline-none focus:border-primary transition"
+                    />
+                    <button 
+                    type="submit"
+                    disabled={!inputValue.trim()}
+                    className="p-2 rounded-full bg-zinc-800 hover:bg-zinc-700 transition disabled:opacity-50 text-white"
+                    style={{ color: chatbot.theme_color }}
+                    >
+                    <Send size={18} />
+                    </button>
+                </form>
+                <div className="mt-2 text-center">
+                    <a href="#" className="text-[10px] text-zinc-600 hover:text-zinc-500 transition">Powered by NexusBot</a>
+                </div>
+            </div>
+        </>
+      )}
     </div>
   );
 };

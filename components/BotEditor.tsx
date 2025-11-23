@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Save, Wand2, Code, Copy, Layout, AlertTriangle } from 'lucide-react';
-import { AppView, Chatbot } from '../types';
+import { ArrowLeft, Save, Wand2, Code, Copy, Layout, AlertTriangle, Users } from 'lucide-react';
+import { AppView, Chatbot, LeadConfig } from '../types';
 import { getSupabase } from '../supabaseClient';
 import { generateBotPersona } from '../services/geminiService';
 import { WidgetPreview } from './WidgetPreview';
@@ -22,7 +22,14 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
     role_definition: '',
     knowledge_base: '',
     api_key: '',
-    theme_color: '#3b82f6'
+    theme_color: '#3b82f6',
+    lead_config: {
+        enabled: false,
+        nameRequired: false,
+        emailRequired: false,
+        phoneRequired: false,
+        title: 'Tell us a bit about yourself'
+    }
   });
 
   useEffect(() => {
@@ -35,7 +42,11 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
   const loadBot = async (id: string) => {
     setLoading(true);
     const { data, error } = await supabase!.from('chatbots').select('*').eq('id', id).single();
-    if (data) setFormData(data);
+    if (data) {
+        // Ensure default structure for existing bots
+        const leadConfig = data.lead_config || { enabled: false, nameRequired: false, emailRequired: false, phoneRequired: false };
+        setFormData({ ...data, lead_config: leadConfig });
+    }
     if (error) {
         console.error(error);
         setErrorMsg("Failed to load chatbot. " + error.message);
@@ -98,6 +109,16 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
     }
   };
 
+  const updateLeadConfig = (key: keyof LeadConfig, value: any) => {
+    setFormData(prev => ({
+        ...prev,
+        lead_config: {
+            ...(prev.lead_config as LeadConfig),
+            [key]: value
+        }
+    }));
+  };
+
   const handleGenerateRole = async () => {
     if (!formData.name) {
         setErrorMsg("Please enter a name first to generate instructions.");
@@ -113,7 +134,6 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
 
   // Generate robust script
   // Uses current origin for Vercel support
-  // Appends to head if body is missing to avoid errors
   const currentOrigin = window.location.origin;
   const embedCode = `<script>
   window.nexusBotId = "${botId || 'YOUR_BOT_ID'}";
@@ -121,7 +141,6 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
     var d = document, s = d.createElement("script");
     s.src = "${currentOrigin}/widget.js";
     s.async = true;
-    // Insert before closing body or append to head if body not yet ready
     var target = d.getElementsByTagName("body")[0] || d.getElementsByTagName("head")[0];
     target.appendChild(s);
   })();
@@ -218,6 +237,75 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
                   </div>
                 </section>
 
+                {/* Lead Gen Section */}
+                <section className="bg-surface border border-zinc-800 rounded-xl p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                            <Users size={20} className="text-primary" />
+                            Lead Generation
+                        </h3>
+                        <div className="flex items-center gap-2">
+                            <label className="text-sm text-zinc-400 cursor-pointer select-none" htmlFor="lead-toggle">
+                                {formData.lead_config?.enabled ? 'Enabled' : 'Disabled'}
+                            </label>
+                            <button
+                                id="lead-toggle"
+                                onClick={() => updateLeadConfig('enabled', !formData.lead_config?.enabled)}
+                                className={`w-11 h-6 rounded-full transition-colors relative ${formData.lead_config?.enabled ? 'bg-primary' : 'bg-zinc-700'}`}
+                            >
+                                <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.lead_config?.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {formData.lead_config?.enabled && (
+                        <div className="bg-zinc-950/50 rounded-lg p-4 space-y-4 animate-in fade-in slide-in-from-top-2 border border-zinc-800">
+                             <p className="text-sm text-zinc-400">Select information to collect before the chat starts:</p>
+                             
+                             <div className="flex flex-wrap gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer bg-zinc-900 px-3 py-2 rounded border border-zinc-800 hover:border-zinc-700 transition">
+                                    <input 
+                                        type="checkbox" 
+                                        className="rounded border-zinc-700 bg-zinc-950 text-primary focus:ring-primary/50"
+                                        checked={formData.lead_config?.nameRequired}
+                                        onChange={e => updateLeadConfig('nameRequired', e.target.checked)}
+                                    />
+                                    <span className="text-sm text-white">Name</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer bg-zinc-900 px-3 py-2 rounded border border-zinc-800 hover:border-zinc-700 transition">
+                                    <input 
+                                        type="checkbox" 
+                                        className="rounded border-zinc-700 bg-zinc-950 text-primary focus:ring-primary/50"
+                                        checked={formData.lead_config?.emailRequired}
+                                        onChange={e => updateLeadConfig('emailRequired', e.target.checked)}
+                                    />
+                                    <span className="text-sm text-white">Email</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer bg-zinc-900 px-3 py-2 rounded border border-zinc-800 hover:border-zinc-700 transition">
+                                    <input 
+                                        type="checkbox" 
+                                        className="rounded border-zinc-700 bg-zinc-950 text-primary focus:ring-primary/50"
+                                        checked={formData.lead_config?.phoneRequired}
+                                        onChange={e => updateLeadConfig('phoneRequired', e.target.checked)}
+                                    />
+                                    <span className="text-sm text-white">Phone (Celular)</span>
+                                </label>
+                             </div>
+
+                             <div className="pt-2">
+                                <label className="text-sm text-zinc-400 font-medium mb-1 block">Custom Field (Optional)</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="e.g. Order ID, Company Name..."
+                                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-primary"
+                                    value={formData.lead_config?.customField || ''}
+                                    onChange={e => updateLeadConfig('customField', e.target.value)}
+                                />
+                             </div>
+                        </div>
+                    )}
+                </section>
+
                 {/* Brain Section */}
                 <section className="bg-surface border border-zinc-800 rounded-xl p-6 shadow-sm">
                    <div className="flex items-center justify-between mb-4">
@@ -298,9 +386,6 @@ export const BotEditor: React.FC<BotEditorProps> = ({ botId, onNavigate }) => {
                         >
                             <Copy size={16} />
                         </button>
-                     </div>
-                     <div className="mt-4 p-4 bg-blue-500/10 text-blue-400 text-xs rounded-lg border border-blue-500/20">
-                        <strong>Note:</strong> Ensure you have redeployed your application to Vercel for these changes to take effect. The script URL above should match your Vercel domain, not <code>cdn.nexusbot.app</code>.
                      </div>
                   </section>
               </div>

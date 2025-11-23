@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, X, Minus, Bot } from 'lucide-react';
 import { Chatbot, Message } from '../types';
 import { simulateChatResponse } from '../services/geminiService';
-import { getSupabase } from '../supabaseClient';
 
 interface WidgetPreviewProps {
   chatbot: Chatbot;
@@ -10,15 +9,28 @@ interface WidgetPreviewProps {
 
 export const WidgetPreview: React.FC<WidgetPreviewProps> = ({ chatbot }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showLeadForm, setShowLeadForm] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-
+  
+  // Reset state when opening/closing or changing lead config
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      setMessages([
+     if (isOpen) {
+         if (chatbot.lead_config?.enabled) {
+             setShowLeadForm(true);
+             setMessages([]);
+         } else if (messages.length === 0) {
+             // If no lead form, start chat immediately
+             startChat();
+         }
+     }
+  }, [isOpen, chatbot.lead_config?.enabled]);
+
+  const startChat = () => {
+    setShowLeadForm(false);
+    setMessages([
         {
           id: 'welcome',
           chatbot_id: chatbot.id,
@@ -27,9 +39,8 @@ export const WidgetPreview: React.FC<WidgetPreviewProps> = ({ chatbot }) => {
           created_at: new Date().toISOString(),
           session_id: 'local'
         }
-      ]);
-    }
-  }, [isOpen, chatbot]);
+    ]);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,7 +48,7 @@ export const WidgetPreview: React.FC<WidgetPreviewProps> = ({ chatbot }) => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isOpen]);
+  }, [messages, isOpen, showLeadForm]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -48,42 +59,12 @@ export const WidgetPreview: React.FC<WidgetPreviewProps> = ({ chatbot }) => {
       role: 'user',
       content: inputValue,
       created_at: new Date().toISOString(),
-      session_id: sessionId || 'temp'
+      session_id: 'temp'
     };
 
     setMessages(prev => [...prev, userMsg]);
     setInputValue('');
     setIsTyping(true);
-
-    // Save to Supabase if configured (Preview Mode)
-    const supabase = getSupabase();
-    let currentSessionId = sessionId;
-
-    if (supabase) {
-      try {
-        if (!currentSessionId) {
-            const { data: session } = await supabase.from('sessions').insert({
-            chatbot_id: chatbot.id,
-            preview_text: userMsg.content.substring(0, 50)
-            }).select().single();
-            if (session) {
-            currentSessionId = session.id;
-            setSessionId(session.id);
-            }
-        }
-
-        if (currentSessionId) {
-            await supabase.from('messages').insert({
-            chatbot_id: chatbot.id,
-            session_id: currentSessionId,
-            role: 'user',
-            content: userMsg.content
-            });
-        }
-      } catch(e) {
-          // Ignore errors in preview mode
-      }
-    }
 
     // Simulate AI Response
     const responseText = await simulateChatResponse(
@@ -98,22 +79,16 @@ export const WidgetPreview: React.FC<WidgetPreviewProps> = ({ chatbot }) => {
       role: 'assistant',
       content: responseText,
       created_at: new Date().toISOString(),
-      session_id: currentSessionId || 'temp'
+      session_id: 'temp'
     };
 
     setMessages(prev => [...prev, aiMsg]);
     setIsTyping(false);
+  };
 
-    if (supabase && currentSessionId) {
-       try {
-        await supabase.from('messages').insert({
-            chatbot_id: chatbot.id,
-            session_id: currentSessionId,
-            role: 'assistant',
-            content: aiMsg.content
-            });
-       } catch(e) {}
-    }
+  const handleLeadSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      startChat();
   };
 
   return (
@@ -142,63 +117,92 @@ export const WidgetPreview: React.FC<WidgetPreviewProps> = ({ chatbot }) => {
             </div>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 bg-zinc-950/50 p-4 overflow-y-auto space-y-4">
-            {messages.map((msg) => (
-              <div 
-                key={msg.id} 
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div 
-                  className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                    msg.role === 'user' 
-                      ? 'bg-primary text-white rounded-br-sm' 
-                      : 'bg-secondary text-zinc-200 rounded-bl-sm'
-                  }`}
-                  style={msg.role === 'user' ? { backgroundColor: chatbot.theme_color } : {}}
-                >
-                  {msg.content}
-                </div>
-              </div>
-            ))}
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-secondary px-4 py-3 rounded-2xl rounded-bl-sm flex gap-1">
-                  <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
-                  <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce delay-75"></span>
-                  <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce delay-150"></span>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="p-4 bg-surface border-t border-zinc-800">
-            <form 
-              onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
-              className="flex items-center gap-2"
-            >
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Type your message..."
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-full px-4 py-2 text-sm text-white focus:outline-none focus:border-primary transition"
-              />
-              <button 
-                type="submit"
-                className="p-2 rounded-full bg-zinc-800 text-primary hover:bg-zinc-700 transition disabled:opacity-50"
-                disabled={!inputValue.trim()}
-                style={{ color: chatbot.theme_color }}
-              >
-                <Send size={18} />
-              </button>
-            </form>
-            <div className="mt-2 text-center">
-                <p className="text-[10px] text-zinc-500">Powered by NexusBot</p>
+          {showLeadForm ? (
+            <div className="flex-1 bg-zinc-950 p-6 flex flex-col justify-center animate-in fade-in">
+                <h3 className="text-white font-medium mb-4 text-center">Please fill in your details</h3>
+                <form onSubmit={handleLeadSubmit} className="space-y-3">
+                    {chatbot.lead_config?.nameRequired && (
+                        <input type="text" placeholder="Name" className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-sm text-white" required />
+                    )}
+                    {chatbot.lead_config?.emailRequired && (
+                        <input type="email" placeholder="Email" className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-sm text-white" required />
+                    )}
+                    {chatbot.lead_config?.phoneRequired && (
+                        <input type="tel" placeholder="Phone" className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-sm text-white" required />
+                    )}
+                    {chatbot.lead_config?.customField && (
+                        <input type="text" placeholder={chatbot.lead_config.customField} className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-sm text-white" required />
+                    )}
+                    <button 
+                        type="submit" 
+                        className="w-full py-2 rounded text-white font-medium mt-2"
+                        style={{ backgroundColor: chatbot.theme_color }}
+                    >
+                        Start Chat
+                    </button>
+                </form>
             </div>
-          </div>
+          ) : (
+            <>
+                {/* Messages */}
+                <div className="flex-1 bg-zinc-950/50 p-4 overflow-y-auto space-y-4">
+                    {messages.map((msg) => (
+                    <div 
+                        key={msg.id} 
+                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                        <div 
+                        className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                            msg.role === 'user' 
+                            ? 'bg-primary text-white rounded-br-sm' 
+                            : 'bg-secondary text-zinc-200 rounded-bl-sm'
+                        }`}
+                        style={msg.role === 'user' ? { backgroundColor: chatbot.theme_color } : {}}
+                        >
+                        {msg.content}
+                        </div>
+                    </div>
+                    ))}
+                    {isTyping && (
+                    <div className="flex justify-start">
+                        <div className="bg-secondary px-4 py-3 rounded-2xl rounded-bl-sm flex gap-1">
+                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
+                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce delay-75"></span>
+                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce delay-150"></span>
+                        </div>
+                    </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input */}
+                <div className="p-4 bg-surface border-t border-zinc-800">
+                    <form 
+                    onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                    className="flex items-center gap-2"
+                    >
+                    <input
+                        type="text"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        placeholder="Type your message..."
+                        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-full px-4 py-2 text-sm text-white focus:outline-none focus:border-primary transition"
+                    />
+                    <button 
+                        type="submit"
+                        className="p-2 rounded-full bg-zinc-800 text-primary hover:bg-zinc-700 transition disabled:opacity-50"
+                        disabled={!inputValue.trim()}
+                        style={{ color: chatbot.theme_color }}
+                    >
+                        <Send size={18} />
+                    </button>
+                    </form>
+                    <div className="mt-2 text-center">
+                        <p className="text-[10px] text-zinc-500">Preview Mode</p>
+                    </div>
+                </div>
+            </>
+          )}
         </div>
       )}
 

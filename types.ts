@@ -1,3 +1,12 @@
+export interface LeadConfig {
+  enabled: boolean;
+  title?: string;
+  nameRequired: boolean;
+  emailRequired: boolean;
+  phoneRequired: boolean;
+  customField?: string; // If set, asks for this specific info
+}
+
 export interface Chatbot {
   id: string;
   created_at: string;
@@ -7,6 +16,7 @@ export interface Chatbot {
   api_key: string;
   theme_color: string;
   avatar_url?: string;
+  lead_config?: LeadConfig;
 }
 
 export interface Message {
@@ -24,6 +34,7 @@ export interface ChatSession {
   created_at: string;
   preview_text: string;
   origin_url?: string;
+  user_data?: Record<string, string>; // Stores name, email, etc.
 }
 
 export enum AppView {

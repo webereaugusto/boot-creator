@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, MessageSquare, User, Clock, Calendar, Globe } from 'lucide-react';
+import { ArrowLeft, MessageSquare, User, Clock, Calendar, Globe, Mail, Phone, Info } from 'lucide-react';
 import { AppView, Chatbot, ChatSession, Message } from '../types';
 import { getSupabase } from '../supabaseClient';
 
@@ -61,6 +61,7 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
   };
 
   const activeSession = sessions.find(s => s.id === selectedSessionId);
+  const userData = activeSession?.user_data;
 
   return (
     <div className="flex h-screen bg-background">
@@ -94,7 +95,8 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
                 >
                   <div className="flex justify-between items-start mb-1">
                     <span className="font-medium text-zinc-300 text-sm flex items-center gap-2">
-                        <User size={14} /> Visitor
+                        <User size={14} /> 
+                        {session.user_data && session.user_data['Name'] ? session.user_data['Name'] : 'Visitor'}
                     </span>
                     <span className="text-[10px] text-zinc-500">{formatDate(session.created_at)}</span>
                   </div>
@@ -118,27 +120,63 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
       <div className="flex-1 flex flex-col bg-background relative">
         {selectedSessionId ? (
           <>
-            <div className="p-4 border-b border-zinc-800 bg-surface/50 backdrop-blur flex items-center justify-between">
-               <div className="flex items-center gap-6 text-zinc-300">
-                  <div className="flex items-center gap-2">
-                    <Clock size={16} />
-                    <span className="text-sm">Session: <span className="font-mono text-zinc-500">{selectedSessionId.slice(0,8)}</span></span>
-                  </div>
-                  {activeSession?.origin_url && (
-                    <div className="flex items-center gap-2 max-w-[400px] text-sm group">
-                        <Globe size={16} className="text-zinc-500 group-hover:text-primary transition" />
-                        <a 
-                            href={activeSession.origin_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-zinc-400 hover:text-primary hover:underline truncate transition"
-                            title={activeSession.origin_url}
-                        >
-                            {activeSession.origin_url}
-                        </a>
+            {/* Top Bar with Lead Info */}
+            <div className="border-b border-zinc-800 bg-surface/50 backdrop-blur">
+                <div className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-6 text-zinc-300">
+                        <div className="flex items-center gap-2">
+                            <Clock size={16} />
+                            <span className="text-sm">Session: <span className="font-mono text-zinc-500">{selectedSessionId.slice(0,8)}</span></span>
+                        </div>
+                        {activeSession?.origin_url && (
+                            <div className="flex items-center gap-2 max-w-[300px] text-sm group">
+                                <Globe size={16} className="text-zinc-500 group-hover:text-primary transition" />
+                                <a 
+                                    href={activeSession.origin_url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-zinc-400 hover:text-primary hover:underline truncate transition"
+                                >
+                                    {activeSession.origin_url}
+                                </a>
+                            </div>
+                        )}
                     </div>
-                  )}
-               </div>
+                </div>
+                
+                {/* Contact Card (Only if data exists) */}
+                {userData && Object.keys(userData).length > 0 && (
+                    <div className="px-4 pb-4 flex flex-wrap gap-4">
+                        {userData['Name'] && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 rounded-lg text-sm text-white">
+                                <User size={14} className="text-zinc-400" />
+                                {userData['Name']}
+                            </div>
+                        )}
+                        {userData['Email'] && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 rounded-lg text-sm text-white">
+                                <Mail size={14} className="text-zinc-400" />
+                                <a href={`mailto:${userData['Email']}`} className="hover:text-primary">{userData['Email']}</a>
+                            </div>
+                        )}
+                        {userData['Phone'] && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 rounded-lg text-sm text-white">
+                                <Phone size={14} className="text-zinc-400" />
+                                {userData['Phone']}
+                            </div>
+                        )}
+                        {/* Custom Fields */}
+                        {Object.entries(userData).map(([key, value]) => {
+                            if (['Name', 'Email', 'Phone'].includes(key)) return null;
+                            return (
+                                <div key={key} className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 rounded-lg text-sm text-white">
+                                    <Info size={14} className="text-zinc-400" />
+                                    <span className="text-zinc-500 text-xs uppercase">{key}:</span> {value as string}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-6">
