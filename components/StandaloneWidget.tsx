@@ -106,10 +106,15 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     if (supabase) {
       try {
         if (!currentSessionId) {
+            // Get origin from URL params
+            const params = new URLSearchParams(window.location.search);
+            const originUrl = params.get('origin');
+
             // Create new session
             const { data: session } = await supabase.from('sessions').insert({
                 chatbot_id: chatbot.id,
-                preview_text: userMsg.content.substring(0, 50)
+                preview_text: userMsg.content.substring(0, 50),
+                origin_url: originUrl || undefined
             }).select().single();
             
             if (session) {

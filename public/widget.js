@@ -33,9 +33,12 @@
        }
     } catch(e) {}
 
+    // Capture current page URL as Origin
+    const originUrl = encodeURIComponent(window.location.href);
+
     // Create Iframe
     const iframe = document.createElement('iframe');
-    iframe.src = `${appUrl}/?embed=true&botId=${botId}${extraParams}`;
+    iframe.src = `${appUrl}/?embed=true&botId=${botId}${extraParams}&origin=${originUrl}`;
     iframe.id = 'nexus-bot-iframe';
     iframe.setAttribute('scrolling', 'no'); // Force no scrolling attribute
     iframe.allow = "clipboard-read; clipboard-write"; 
@@ -54,6 +57,7 @@
     style.boxShadow = 'none'; 
     style.colorScheme = 'normal'; 
     style.overflow = 'hidden'; // Force hidden in style
+    style.backgroundColor = 'transparent'; // Ensure transparency for the round button look
 
     document.body.appendChild(iframe);
 

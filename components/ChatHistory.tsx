@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, MessageSquare, User, Clock, Calendar } from 'lucide-react';
+import { ArrowLeft, MessageSquare, User, Clock, Calendar, Globe } from 'lucide-react';
 import { AppView, Chatbot, ChatSession, Message } from '../types';
 import { getSupabase } from '../supabaseClient';
 
@@ -60,6 +60,8 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
     });
   };
 
+  const activeSession = sessions.find(s => s.id === selectedSessionId);
+
   return (
     <div className="flex h-screen bg-background">
       {/* Left Sidebar: Session List */}
@@ -99,6 +101,12 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
                   <p className="text-xs text-zinc-500 line-clamp-2">
                     {session.preview_text || 'New Conversation'}
                   </p>
+                  {session.origin_url && (
+                    <div className="mt-1 flex items-center gap-1 text-[10px] text-zinc-600 truncate">
+                        <Globe size={10} />
+                        {new URL(session.origin_url).pathname}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -111,9 +119,25 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
         {selectedSessionId ? (
           <>
             <div className="p-4 border-b border-zinc-800 bg-surface/50 backdrop-blur flex items-center justify-between">
-               <div className="flex items-center gap-2 text-zinc-300">
-                  <Clock size={16} />
-                  <span className="text-sm">Session ID: <span className="font-mono text-zinc-500">{selectedSessionId.slice(0,8)}...</span></span>
+               <div className="flex items-center gap-6 text-zinc-300">
+                  <div className="flex items-center gap-2">
+                    <Clock size={16} />
+                    <span className="text-sm">Session: <span className="font-mono text-zinc-500">{selectedSessionId.slice(0,8)}</span></span>
+                  </div>
+                  {activeSession?.origin_url && (
+                    <div className="flex items-center gap-2 max-w-[400px] text-sm group">
+                        <Globe size={16} className="text-zinc-500 group-hover:text-primary transition" />
+                        <a 
+                            href={activeSession.origin_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-zinc-400 hover:text-primary hover:underline truncate transition"
+                            title={activeSession.origin_url}
+                        >
+                            {activeSession.origin_url}
+                        </a>
+                    </div>
+                  )}
                </div>
             </div>
 

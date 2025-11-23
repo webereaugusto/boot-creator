@@ -23,6 +23,7 @@ export interface ChatSession {
   chatbot_id: string;
   created_at: string;
   preview_text: string;
+  origin_url?: string;
 }
 
 export enum AppView {

@@ -88,7 +88,8 @@ create table if not exists sessions (
   id uuid default gen_random_uuid() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   chatbot_id uuid references chatbots(id) on delete cascade,
-  preview_text text
+  preview_text text,
+  origin_url text
 );
 
 -- 4. Create Messages Table
