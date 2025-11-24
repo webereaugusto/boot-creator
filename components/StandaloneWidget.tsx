@@ -77,7 +77,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
           id: 'welcome',
           chatbot_id: chatbot.id,
           role: 'assistant',
-          content: `Hello! I am ${chatbot.name}. How can I help you today?`,
+          content: `Olá! Eu sou ${chatbot.name}. Como posso ajudar você hoje?`,
           created_at: new Date().toISOString(),
           session_id: 'local'
         }
@@ -109,7 +109,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
 
             const { data: session } = await supabase.from('sessions').insert({
                 chatbot_id: chatbot.id,
-                preview_text: 'Lead Form Submitted',
+                preview_text: 'Formulário de Lead Enviado',
                 origin_url: originUrl || undefined,
                 user_data: leadData
             }).select().single();
@@ -146,7 +146,6 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     if (supabase) {
       try {
         if (!currentSessionId) {
-            // Just in case we didn't create it in lead form
             const params = new URLSearchParams(window.location.search);
             const originUrl = params.get('origin');
 
@@ -176,9 +175,67 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
       }
     }
 
+    // --- LÓGICA DE AGENDAMENTO (CÉREBRO) ---
+    // Injetamos a data atual e as regras de horário no prompt para que o Gemini possa validar e confirmar agendamentos.
+    let systemInstruction = chatbot.role_definition;
+    let knowledgeBase = chatbot.knowledge_base;
+
+    if (chatbot.scheduling_config?.enabled) {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        const scheduleInfo = `
+        CONTEXTO DE DATA E HORA ATUAL:
+        - Hoje é: ${dateStr}, ${timeStr}.
+        - Fuso Horário: Horário de Brasília.
+        
+        REGRAS DE AGENDAMENTO:
+        - Duração da consulta: ${chatbot.scheduling_config.durationMinutes} minutos.
+        - Horários de Funcionamento (Disponibilidade):
+          ${chatbot.scheduling_config.availability.filter(d => d.enabled).map(d => `${d.day}: ${d.start} às ${d.end}`).join('\n          ')}
+        
+        INSTRUÇÃO CRÍTICA PARA AGENDAMENTO:
+        - Verifique se a data solicitada é futura e está dentro do horário de funcionamento.
+        - Se o usuário confirmar explicitamente um horário, você DEVE adicionar a seguinte tag JSON oculta no final da sua resposta (sem blocos de código):
+          [AGENDAMENTO: {"start": "AAAA-MM-DDTHH:MM:00", "end": "AAAA-MM-DDTHH:MM:00"}]
+        - A data deve estar no formato ISO 8601 exato. Calcule o horário de fim baseado na duração (${chatbot.scheduling_config.durationMinutes} min).
+        - Apenas gere essa tag se o usuário CONFIRMAR. Se ele apenas perguntar disponibilidade, apenas responda.
+        `;
+        
+        knowledgeBase += scheduleInfo;
+    }
+
     // Generate Response
     const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
-    const responseText = await simulateChatResponse(history, chatbot.role_definition, chatbot.knowledge_base);
+    let responseText = await simulateChatResponse(history, systemInstruction, knowledgeBase);
+
+    // --- INTERCEPTAR AÇÃO DE AGENDAMENTO ---
+    const bookingRegex = /\[AGENDAMENTO:\s*({.*?})\]/s;
+    const match = responseText.match(bookingRegex);
+    
+    if (match && supabase && currentSessionId) {
+        try {
+            const bookingData = JSON.parse(match[1]);
+            // Remove a tag da resposta visível para o usuário
+            responseText = responseText.replace(match[0], '').trim();
+            
+            // Salvar no Supabase
+            await supabase.from('appointments').insert({
+                chatbot_id: chatbot.id,
+                session_id: currentSessionId,
+                start_time: bookingData.start,
+                end_time: bookingData.end,
+                status: 'confirmed',
+                user_data: leadData || {} // Atribui os dados do lead se houver
+            });
+
+            // Adiciona feedback visual
+            responseText += "\n\n✅ Agendamento confirmado no sistema com sucesso!";
+        } catch (e) {
+            console.error("Falha ao processar agendamento", e);
+        }
+    }
 
     const aiMsg: Message = {
       id: (Date.now() + 1).toString(),
@@ -205,7 +262,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   };
 
   if (loading) return <div className="flex items-center justify-center h-screen text-zinc-500 bg-transparent"></div>;
-  if (!chatbot) return <div className="flex items-center justify-center h-screen text-red-500 bg-zinc-950 p-4 text-center">Bot unavailable.</div>;
+  if (!chatbot) return <div className="flex items-center justify-center h-screen text-red-500 bg-zinc-950 p-4 text-center">Bot indisponível.</div>;
 
   if (!isOpen) {
     return (
@@ -245,14 +302,14 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
       {showLeadForm ? (
           <div className="flex-1 bg-zinc-950 p-8 flex flex-col justify-center animate-in fade-in">
              <div className="text-center mb-6">
-                <h3 className="text-white font-semibold text-lg">Welcome</h3>
-                <p className="text-zinc-400 text-sm mt-1">Please fill in your details to start chatting.</p>
+                <h3 className="text-white font-semibold text-lg">Bem-vindo</h3>
+                <p className="text-zinc-400 text-sm mt-1">Por favor, preencha seus dados para iniciar o chat.</p>
              </div>
              
              <form onSubmit={handleLeadSubmit} className="space-y-4">
                  {chatbot.lead_config?.nameRequired && (
                      <div>
-                        <label className="text-xs text-zinc-500 font-medium ml-1">Name</label>
+                        <label className="text-xs text-zinc-500 font-medium ml-1">Nome</label>
                         <input 
                             type="text" 
                             className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" 
@@ -263,7 +320,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
                  )}
                  {chatbot.lead_config?.emailRequired && (
                      <div>
-                        <label className="text-xs text-zinc-500 font-medium ml-1">Email</label>
+                        <label className="text-xs text-zinc-500 font-medium ml-1">E-mail</label>
                         <input 
                             type="email" 
                             className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" 
@@ -274,7 +331,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
                  )}
                  {chatbot.lead_config?.phoneRequired && (
                      <div>
-                        <label className="text-xs text-zinc-500 font-medium ml-1">Phone</label>
+                        <label className="text-xs text-zinc-500 font-medium ml-1">Telefone</label>
                         <input 
                             type="tel" 
                             className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" 
@@ -299,7 +356,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
                      className="w-full py-3 rounded-lg text-white font-medium mt-4 hover:opacity-90 transition"
                      style={{ backgroundColor: chatbot.theme_color || '#3b82f6' }}
                  >
-                     Start Chat
+                     Iniciar Chat
                  </button>
              </form>
           </div>
@@ -346,7 +403,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
                     type="text"
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    placeholder="Type a message..."
+                    placeholder="Digite uma mensagem..."
                     className="flex-1 bg-zinc-900 border border-zinc-700 rounded-full px-4 py-2 text-sm text-white focus:outline-none focus:border-primary transition"
                     />
                     <button 
@@ -359,7 +416,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
                     </button>
                 </form>
                 <div className="mt-2 text-center">
-                    <a href="#" className="text-[10px] text-zinc-600 hover:text-zinc-500 transition">Powered by NexusBot</a>
+                    <a href="#" className="text-[10px] text-zinc-600 hover:text-zinc-500 transition">Desenvolvido por NexusBot</a>
                 </div>
             </div>
         </>

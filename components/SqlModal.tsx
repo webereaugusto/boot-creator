@@ -22,7 +22,7 @@ export const SqlModal: React.FC<SqlModalProps> = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="bg-surface border border-zinc-800 rounded-xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <h3 className="text-xl font-semibold text-white">Database Setup Required</h3>
+          <h3 className="text-xl font-semibold text-white">Atualização do Banco de Dados Necessária</h3>
           <button onClick={onClose} className="text-zinc-400 hover:text-white transition">
             <X size={24} />
           </button>
@@ -30,9 +30,13 @@ export const SqlModal: React.FC<SqlModalProps> = ({ isOpen, onClose }) => {
         
         <div className="p-6 overflow-y-auto flex-1">
           <p className="text-zinc-400 mb-4">
-            To use this application, you need to create the required tables in your Supabase project. 
-            Copy the SQL below and run it in the <span className="text-white font-medium">SQL Editor</span> of your Supabase dashboard.
+            Para que o sistema de <strong>Agendamento</strong> funcione, você precisa atualizar seu banco de dados.
+            Copie o código abaixo e execute no Editor SQL do Supabase.
           </p>
+          
+          <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-200">
+             <strong>Nota:</strong> Este script cria a tabela "appointments" se ela não existir. É seguro rodar mesmo se você já configurou o básico.
+          </div>
 
           <div className="relative group">
             <div className="absolute top-4 right-4">
@@ -41,7 +45,7 @@ export const SqlModal: React.FC<SqlModalProps> = ({ isOpen, onClose }) => {
                 className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-md text-xs font-medium transition"
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? 'Copied' : 'Copy SQL'}
+                {copied ? 'Copiado' : 'Copiar SQL'}
               </button>
             </div>
             <pre className="bg-black/50 border border-zinc-800 rounded-lg p-4 text-sm text-zinc-300 overflow-x-auto font-mono leading-relaxed">
@@ -55,7 +59,7 @@ export const SqlModal: React.FC<SqlModalProps> = ({ isOpen, onClose }) => {
             onClick={onClose}
             className="px-6 py-2.5 bg-zinc-100 text-zinc-900 hover:bg-white font-medium rounded-lg transition"
           >
-            I have run the script
+            Fechar
           </button>
         </div>
       </div>
