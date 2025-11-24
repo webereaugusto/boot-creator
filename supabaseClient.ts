@@ -68,7 +68,6 @@ if (supabaseUrl && supabaseAnonKey) {
 
 export const SQL_SETUP_SCRIPT = `
 -- 1. Enable required extensions
--- pgcrypto is required for gen_random_uuid()
 create extension if not exists "pgcrypto";
 
 -- 2. Create Chatbots Table
@@ -81,7 +80,8 @@ create table if not exists chatbots (
   api_key text,
   theme_color text default '#3b82f6',
   avatar_url text,
-  lead_config jsonb default '{"enabled": false}'::jsonb
+  lead_config jsonb default '{"enabled": false}'::jsonb,
+  scheduling_config jsonb default '{"enabled": false}'::jsonb
 );
 
 -- 3. Create Sessions Table
@@ -104,14 +104,27 @@ create table if not exists messages (
   content text not null
 );
 
--- 5. Enable Row Level Security (RLS)
+-- 5. Create Appointments Table
+create table if not exists appointments (
+  id uuid default gen_random_uuid() primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  chatbot_id uuid references chatbots(id) on delete cascade,
+  session_id uuid references sessions(id) on delete cascade,
+  user_data jsonb,
+  start_time timestamp with time zone not null,
+  end_time timestamp with time zone not null,
+  status text default 'confirmed'
+);
+
+-- 6. Enable Row Level Security (RLS)
 alter table chatbots enable row level security;
 alter table sessions enable row level security;
 alter table messages enable row level security;
+alter table appointments enable row level security;
 
--- 6. Create Policies (Development Mode - Public Access)
--- NOTE: For production, you should restrict these policies to authenticated users only.
+-- 7. Create Policies (Development Mode - Public Access)
 create policy "Public chatbots access" on chatbots for all using (true);
 create policy "Public sessions access" on sessions for all using (true);
 create policy "Public messages access" on messages for all using (true);
+create policy "Public appointments access" on appointments for all using (true);
 `;
