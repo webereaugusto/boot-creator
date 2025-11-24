@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, MessageSquare, User, Clock, Calendar, Globe, Mail, Phone, Info, Smartphone, Monitor, MapPin, Tag } from 'lucide-react';
+import { ArrowLeft, MessageSquare, User, Clock, Calendar, Globe, Mail, Phone, Info, Smartphone, Monitor, MapPin, Tag, Cpu, Wifi, Map } from 'lucide-react';
 import { AppView, Chatbot, ChatSession, Message } from '../types';
 import { getSupabase } from '../supabaseClient';
 
@@ -217,9 +217,9 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
                                 <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
                                     {getOSIcon(clientInfo.userAgent)}
                                 </div>
-                                <div className="flex-1">
+                                <div className="flex-1 overflow-hidden">
                                     <div className="text-xs text-zinc-500">OS / Browser</div>
-                                    <div className="truncate w-48" title={clientInfo.userAgent}>{clientInfo.platform || 'Unknown Platform'}</div>
+                                    <div className="truncate w-full" title={clientInfo.userAgent}>{clientInfo.platform || 'Unknown Platform'}</div>
                                 </div>
                              </div>
                              <div className="flex items-center gap-3 text-sm text-zinc-300">
@@ -227,11 +227,49 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
                                     <Monitor size={16} />
                                 </div>
                                 <div className="flex-1">
-                                    <div className="text-xs text-zinc-500">Screen Resolution</div>
+                                    <div className="text-xs text-zinc-500">Screen</div>
                                     <div>{clientInfo.screenSize || 'N/A'}</div>
                                 </div>
                              </div>
                              <div className="flex items-center gap-3 text-sm text-zinc-300">
+                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
+                                    <Cpu size={16} />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-xs text-zinc-500">Hardware</div>
+                                    <div>{clientInfo.hardwareConcurrency ? `${clientInfo.hardwareConcurrency} Cores` : 'Unknown'}</div>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    {/* Network & Location */}
+                    <div>
+                         <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Network & Locale</h4>
+                         <div className="space-y-3">
+                            <div className="flex items-center gap-3 text-sm text-zinc-300">
+                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
+                                    <Wifi size={16} />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-xs text-zinc-500">Connection</div>
+                                    <div>
+                                        {clientInfo.network ? (
+                                            <span className="uppercase">{clientInfo.network.effectiveType} <span className="text-zinc-500 normal-case">({clientInfo.network.downlink} Mbps)</span></span>
+                                        ) : 'Unknown'}
+                                    </div>
+                                </div>
+                             </div>
+                             <div className="flex items-center gap-3 text-sm text-zinc-300">
+                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
+                                    <Map size={16} />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-xs text-zinc-500">Timezone</div>
+                                    <div className="truncate w-full" title={clientInfo.timezone}>{clientInfo.timezone || 'N/A'}</div>
+                                </div>
+                             </div>
+                              <div className="flex items-center gap-3 text-sm text-zinc-300">
                                 <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
                                     <Globe size={16} />
                                 </div>
@@ -240,7 +278,7 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
                                     <div>{clientInfo.language || 'N/A'}</div>
                                 </div>
                              </div>
-                        </div>
+                         </div>
                     </div>
 
                     {/* Origin */}

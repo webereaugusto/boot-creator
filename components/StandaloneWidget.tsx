@@ -20,9 +20,24 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   // Lead Gen State
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [leadData, setLeadData] = useState<Record<string, string>>({});
+  
+  // Advanced Client Info State
+  const [clientInfo, setClientInfo] = useState<any>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const supabase = getSupabase();
+
+  // Listen for Client Info from Parent Window
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'nexus-client-info') {
+            console.log("Received client info:", event.data.data);
+            setClientInfo(event.data.data);
+        }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // Load Bot Data & Restore Session
   useEffect(() => {
@@ -69,7 +84,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     init();
   }, [botId, supabase]);
 
-  // Initial Greeting (Only if no messages exist and not showing form)
+  // Initial Greeting
   useEffect(() => {
     if (isOpen && !showLeadForm && messages.length === 0 && chatbot && !loading) {
       setMessages([
@@ -98,36 +113,21 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     sendMessage(isOpen);
   }, [isOpen]);
 
-  // Helper to extract client info from URL
-  const getClientInfo = () => {
-    const params = new URLSearchParams(window.location.search);
-    const metaStr = params.get('meta');
-    if (metaStr) {
-        try {
-            return JSON.parse(metaStr);
-        } catch (e) {
-            return null;
-        }
-    }
-    return null;
-  };
 
   const handleLeadSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       
-      // Create session immediately with the lead data
       if (supabase && chatbot) {
         try {
             const params = new URLSearchParams(window.location.search);
             const originUrl = params.get('origin');
-            const clientInfo = getClientInfo();
 
             const { data: session } = await supabase.from('sessions').insert({
                 chatbot_id: chatbot.id,
                 preview_text: 'Lead Form Submitted',
                 origin_url: originUrl || undefined,
                 user_data: leadData,
-                client_info: clientInfo
+                client_info: clientInfo // Save the full object received from postMessage
             }).select().single();
 
             if (session) {
@@ -162,16 +162,15 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     if (supabase) {
       try {
         if (!currentSessionId) {
-            // Just in case we didn't create it in lead form (e.g. lead form disabled)
+            // Just in case we didn't create it in lead form
             const params = new URLSearchParams(window.location.search);
             const originUrl = params.get('origin');
-            const clientInfo = getClientInfo();
 
             const { data: session } = await supabase.from('sessions').insert({
                 chatbot_id: chatbot.id,
                 preview_text: userMsg.content.substring(0, 50),
                 origin_url: originUrl || undefined,
-                client_info: clientInfo
+                client_info: clientInfo // Save the full object received from postMessage
             }).select().single();
             
             if (session) {
@@ -218,7 +217,6 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
             content: aiMsg.content
         });
         
-        // Update session preview text
         await supabase.from('sessions').update({ preview_text: userMsg.content.substring(0, 50) }).eq('id', currentSessionId);
     }
   };

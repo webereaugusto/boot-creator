@@ -24,27 +24,33 @@
 
     // --- COLLECT CLIENT INFO ---
     const collectClientInfo = () => {
+        // Network Information API (Chrome/Edge/Android)
+        // @ts-ignore
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        
         const info = {
             userAgent: navigator.userAgent,
             language: navigator.language,
             platform: navigator.platform,
             screenSize: `${window.screen.width}x${window.screen.height}`,
             referrer: document.referrer,
-            cookies: document.cookie, // Be careful with size limits
+            cookies: document.cookie, // PostMessage handles large payloads fine
             utm_source: new URLSearchParams(window.location.search).get('utm_source'),
             utm_medium: new URLSearchParams(window.location.search).get('utm_medium'),
             utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign'),
-            title: document.title
+            title: document.title,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            hardwareConcurrency: navigator.hardwareConcurrency || 1,
+            network: connection ? {
+                effectiveType: connection.effectiveType, // '4g', '3g', etc
+                downlink: connection.downlink, // Mb/s
+                rtt: connection.rtt // ms
+            } : null
         };
-        // Encode as JSON string for URL safely
-        return encodeURIComponent(JSON.stringify(info));
+        return info;
     };
-
-    const clientMeta = collectClientInfo();
     // ---------------------------
 
-    // Try to get Supabase creds from LocalStorage if testing on same domain, 
-    // or assume they are passed via Env Vars in the app itself.
     let extraParams = '';
     try {
        const sbUrl = localStorage.getItem('sb_url');
@@ -59,13 +65,13 @@
 
     // Create Iframe
     const iframe = document.createElement('iframe');
-    // Pass the meta param
-    iframe.src = `${appUrl}/?embed=true&botId=${botId}${extraParams}&origin=${originUrl}&meta=${clientMeta}`;
+    // Note: We NO LONGER pass 'meta' in the URL to avoid 431 Request Header Too Large errors
+    iframe.src = `${appUrl}/?embed=true&botId=${botId}${extraParams}&origin=${originUrl}`;
     iframe.id = 'nexus-bot-iframe';
-    iframe.setAttribute('scrolling', 'no'); // Force no scrolling attribute
+    iframe.setAttribute('scrolling', 'no'); 
     iframe.allow = "clipboard-read; clipboard-write"; 
     
-    // Styles for the Iframe (Start small - just the bubble)
+    // Styles
     const style = iframe.style;
     style.position = 'fixed';
     style.bottom = '20px';
@@ -73,38 +79,46 @@
     style.width = '80px'; 
     style.height = '80px';
     style.border = 'none';
-    style.zIndex = '2147483647'; // Max Z-Index
+    style.zIndex = '2147483647';
     style.borderRadius = '10px';
     style.transition = 'width 0.3s ease, height 0.3s ease, bottom 0.3s, right 0.3s';
     style.boxShadow = 'none'; 
     style.colorScheme = 'normal'; 
-    style.overflow = 'hidden'; // Force hidden in style
-    style.backgroundColor = 'transparent'; // Ensure transparency for the round button look
+    style.overflow = 'hidden';
+    style.backgroundColor = 'transparent';
+
+    // Send Client Info when Iframe Loads
+    iframe.onload = () => {
+        const clientInfo = collectClientInfo();
+        // Send via secure postMessage
+        iframe.contentWindow.postMessage({
+            type: 'nexus-client-info',
+            data: clientInfo
+        }, '*');
+    };
 
     document.body.appendChild(iframe);
 
-    // Listen for resize messages
+    // Listen for resize messages from Iframe
     window.addEventListener('message', (event) => {
-      // Security check
-      if (event.origin !== appUrl) return;
+      // Basic security check (optional, depending on strictness)
+      // if (event.origin !== appUrl) return;
 
       if (event.data.type === 'nexus-resize') {
         if (event.data.isOpen) {
           // Open State
           if (window.innerWidth < 640) {
-             // Mobile
              style.width = '100%';
              style.height = '100%';
              style.bottom = '0';
              style.right = '0';
              style.borderRadius = '0';
           } else {
-             // Desktop
              style.width = '380px';
              style.height = '650px';
              style.maxHeight = '90vh';
              style.borderRadius = '16px';
-             style.boxShadow = '0 12px 40px rgba(0,0,0,0.3)'; // Shadow on Iframe
+             style.boxShadow = '0 12px 40px rgba(0,0,0,0.3)';
           }
         } else {
           // Closed State
@@ -119,7 +133,6 @@
     });
   }
 
-  // Safe loader
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
     initWidget();
   } else {
