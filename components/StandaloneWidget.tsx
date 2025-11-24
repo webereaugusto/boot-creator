@@ -98,6 +98,20 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     sendMessage(isOpen);
   }, [isOpen]);
 
+  // Helper to extract client info from URL
+  const getClientInfo = () => {
+    const params = new URLSearchParams(window.location.search);
+    const metaStr = params.get('meta');
+    if (metaStr) {
+        try {
+            return JSON.parse(metaStr);
+        } catch (e) {
+            return null;
+        }
+    }
+    return null;
+  };
+
   const handleLeadSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       
@@ -106,12 +120,14 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
         try {
             const params = new URLSearchParams(window.location.search);
             const originUrl = params.get('origin');
+            const clientInfo = getClientInfo();
 
             const { data: session } = await supabase.from('sessions').insert({
                 chatbot_id: chatbot.id,
                 preview_text: 'Lead Form Submitted',
                 origin_url: originUrl || undefined,
-                user_data: leadData
+                user_data: leadData,
+                client_info: clientInfo
             }).select().single();
 
             if (session) {
@@ -149,11 +165,13 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
             // Just in case we didn't create it in lead form (e.g. lead form disabled)
             const params = new URLSearchParams(window.location.search);
             const originUrl = params.get('origin');
+            const clientInfo = getClientInfo();
 
             const { data: session } = await supabase.from('sessions').insert({
                 chatbot_id: chatbot.id,
                 preview_text: userMsg.content.substring(0, 50),
-                origin_url: originUrl || undefined
+                origin_url: originUrl || undefined,
+                client_info: clientInfo
             }).select().single();
             
             if (session) {

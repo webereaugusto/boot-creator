@@ -22,6 +22,27 @@
       return;
     }
 
+    // --- COLLECT CLIENT INFO ---
+    const collectClientInfo = () => {
+        const info = {
+            userAgent: navigator.userAgent,
+            language: navigator.language,
+            platform: navigator.platform,
+            screenSize: `${window.screen.width}x${window.screen.height}`,
+            referrer: document.referrer,
+            cookies: document.cookie, // Be careful with size limits
+            utm_source: new URLSearchParams(window.location.search).get('utm_source'),
+            utm_medium: new URLSearchParams(window.location.search).get('utm_medium'),
+            utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign'),
+            title: document.title
+        };
+        // Encode as JSON string for URL safely
+        return encodeURIComponent(JSON.stringify(info));
+    };
+
+    const clientMeta = collectClientInfo();
+    // ---------------------------
+
     // Try to get Supabase creds from LocalStorage if testing on same domain, 
     // or assume they are passed via Env Vars in the app itself.
     let extraParams = '';
@@ -38,7 +59,8 @@
 
     // Create Iframe
     const iframe = document.createElement('iframe');
-    iframe.src = `${appUrl}/?embed=true&botId=${botId}${extraParams}&origin=${originUrl}`;
+    // Pass the meta param
+    iframe.src = `${appUrl}/?embed=true&botId=${botId}${extraParams}&origin=${originUrl}&meta=${clientMeta}`;
     iframe.id = 'nexus-bot-iframe';
     iframe.setAttribute('scrolling', 'no'); // Force no scrolling attribute
     iframe.allow = "clipboard-read; clipboard-write"; 
