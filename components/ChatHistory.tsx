@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, MessageSquare, User, Clock, Calendar, Globe, Mail, Phone, Info, Smartphone, Monitor, MapPin, Tag, Cpu, Wifi, Map } from 'lucide-react';
+import { ArrowLeft, MessageSquare, User, Clock, Calendar, Globe, Mail, Phone, Info } from 'lucide-react';
 import { AppView, Chatbot, ChatSession, Message } from '../types';
 import { getSupabase } from '../supabaseClient';
 
@@ -60,18 +60,8 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
     });
   };
 
-  const getOSIcon = (ua: string) => {
-    if (!ua) return <Monitor size={16} />;
-    if (ua.includes('Windows')) return <Monitor size={16} />;
-    if (ua.includes('Mac')) return <Monitor size={16} />;
-    if (ua.includes('Android')) return <Smartphone size={16} />;
-    if (ua.includes('iPhone') || ua.includes('iPad')) return <Smartphone size={16} />;
-    return <Monitor size={16} />;
-  };
-
   const activeSession = sessions.find(s => s.id === selectedSessionId);
   const userData = activeSession?.user_data;
-  const clientInfo = activeSession?.client_info;
 
   return (
     <div className="flex h-screen bg-background">
@@ -127,7 +117,7 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
       </div>
 
       {/* Middle Content: Chat View */}
-      <div className="flex-1 flex flex-col bg-background relative border-r border-zinc-800">
+      <div className="flex-1 flex flex-col bg-background relative">
         {selectedSessionId ? (
           <>
             {/* Top Bar with Lead Info */}
@@ -199,164 +189,6 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ botId, onNavigate }) =
           </div>
         )}
       </div>
-
-      {/* Right Sidebar: Visitor Info */}
-      {selectedSessionId && (
-        <div className="w-80 bg-surface/30 flex-shrink-0 flex flex-col overflow-y-auto">
-            <div className="p-4 border-b border-zinc-800">
-                <h3 className="font-semibold text-white">Device & Context</h3>
-            </div>
-
-            {clientInfo ? (
-                <div className="p-4 space-y-6">
-                    {/* Device */}
-                    <div>
-                        <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">System</h4>
-                        <div className="space-y-3">
-                             <div className="flex items-center gap-3 text-sm text-zinc-300">
-                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
-                                    {getOSIcon(clientInfo.userAgent)}
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                    <div className="text-xs text-zinc-500">OS / Browser</div>
-                                    <div className="truncate w-full" title={clientInfo.userAgent}>{clientInfo.platform || 'Unknown Platform'}</div>
-                                </div>
-                             </div>
-                             <div className="flex items-center gap-3 text-sm text-zinc-300">
-                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
-                                    <Monitor size={16} />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-xs text-zinc-500">Screen</div>
-                                    <div>{clientInfo.screenSize || 'N/A'}</div>
-                                </div>
-                             </div>
-                             <div className="flex items-center gap-3 text-sm text-zinc-300">
-                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
-                                    <Cpu size={16} />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-xs text-zinc-500">Hardware</div>
-                                    <div>{clientInfo.hardwareConcurrency ? `${clientInfo.hardwareConcurrency} Cores` : 'Unknown'}</div>
-                                </div>
-                             </div>
-                        </div>
-                    </div>
-
-                    {/* Network & Location */}
-                    <div>
-                         <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Network & Locale</h4>
-                         <div className="space-y-3">
-                            <div className="flex items-center gap-3 text-sm text-zinc-300">
-                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
-                                    <Wifi size={16} />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-xs text-zinc-500">Connection</div>
-                                    <div>
-                                        {clientInfo.network ? (
-                                            <span className="uppercase">{clientInfo.network.effectiveType} <span className="text-zinc-500 normal-case">({clientInfo.network.downlink} Mbps)</span></span>
-                                        ) : 'Unknown'}
-                                    </div>
-                                </div>
-                             </div>
-                             <div className="flex items-center gap-3 text-sm text-zinc-300">
-                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
-                                    <Map size={16} />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-xs text-zinc-500">Timezone</div>
-                                    <div className="truncate w-full" title={clientInfo.timezone}>{clientInfo.timezone || 'N/A'}</div>
-                                </div>
-                             </div>
-                              <div className="flex items-center gap-3 text-sm text-zinc-300">
-                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
-                                    <Globe size={16} />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-xs text-zinc-500">Language</div>
-                                    <div>{clientInfo.language || 'N/A'}</div>
-                                </div>
-                             </div>
-                         </div>
-                    </div>
-
-                    {/* Origin */}
-                    <div>
-                        <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Traffic Source</h4>
-                         <div className="space-y-3">
-                             <div className="flex items-start gap-3 text-sm text-zinc-300">
-                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
-                                    <MapPin size={16} />
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                    <div className="text-xs text-zinc-500">Referrer</div>
-                                    <a href={clientInfo.referrer} target="_blank" className="text-primary hover:underline truncate block" title={clientInfo.referrer}>
-                                        {clientInfo.referrer || 'Direct / None'}
-                                    </a>
-                                </div>
-                             </div>
-                             <div className="flex items-start gap-3 text-sm text-zinc-300">
-                                <div className="p-2 bg-zinc-800 rounded-md text-zinc-400">
-                                    <Globe size={16} />
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                    <div className="text-xs text-zinc-500">Landing Page</div>
-                                    <a href={activeSession?.origin_url} target="_blank" className="text-primary hover:underline truncate block" title={activeSession?.origin_url}>
-                                        {activeSession?.origin_url || 'N/A'}
-                                    </a>
-                                </div>
-                             </div>
-                        </div>
-                    </div>
-
-                    {/* Marketing */}
-                    {(clientInfo.utm_source || clientInfo.utm_campaign || clientInfo.utm_medium) && (
-                        <div>
-                             <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Marketing (UTM)</h4>
-                             <div className="space-y-2">
-                                {clientInfo.utm_source && (
-                                    <div className="flex items-center gap-2 text-xs bg-zinc-900 border border-zinc-800 p-2 rounded">
-                                        <Tag size={12} className="text-zinc-500"/>
-                                        <span className="text-zinc-500">Source:</span>
-                                        <span className="text-white">{clientInfo.utm_source}</span>
-                                    </div>
-                                )}
-                                {clientInfo.utm_medium && (
-                                    <div className="flex items-center gap-2 text-xs bg-zinc-900 border border-zinc-800 p-2 rounded">
-                                        <Tag size={12} className="text-zinc-500"/>
-                                        <span className="text-zinc-500">Medium:</span>
-                                        <span className="text-white">{clientInfo.utm_medium}</span>
-                                    </div>
-                                )}
-                                {clientInfo.utm_campaign && (
-                                    <div className="flex items-center gap-2 text-xs bg-zinc-900 border border-zinc-800 p-2 rounded">
-                                        <Tag size={12} className="text-zinc-500"/>
-                                        <span className="text-zinc-500">Campaign:</span>
-                                        <span className="text-white">{clientInfo.utm_campaign}</span>
-                                    </div>
-                                )}
-                             </div>
-                        </div>
-                    )}
-
-                    {/* Cookies (Collapsed view) */}
-                    <div>
-                        <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Cookies</h4>
-                        <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800 text-[10px] font-mono text-zinc-400 break-all max-h-40 overflow-y-auto">
-                            {clientInfo.cookies || 'No accessible cookies'}
-                        </div>
-                    </div>
-
-                </div>
-            ) : (
-                 <div className="p-8 text-center text-zinc-500 text-sm">
-                    <Info size={24} className="mx-auto mb-2 opacity-50" />
-                    No device data collected for this session.
-                 </div>
-            )}
-        </div>
-      )}
     </div>
   );
 };

@@ -20,24 +20,9 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   // Lead Gen State
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [leadData, setLeadData] = useState<Record<string, string>>({});
-  
-  // Advanced Client Info State
-  const [clientInfo, setClientInfo] = useState<any>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const supabase = getSupabase();
-
-  // Listen for Client Info from Parent Window
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-        if (event.data && event.data.type === 'nexus-client-info') {
-            console.log("Received client info:", event.data.data);
-            setClientInfo(event.data.data);
-        }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
 
   // Load Bot Data & Restore Session
   useEffect(() => {
@@ -126,8 +111,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
                 chatbot_id: chatbot.id,
                 preview_text: 'Lead Form Submitted',
                 origin_url: originUrl || undefined,
-                user_data: leadData,
-                client_info: clientInfo // Save the full object received from postMessage
+                user_data: leadData
             }).select().single();
 
             if (session) {
@@ -169,8 +153,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
             const { data: session } = await supabase.from('sessions').insert({
                 chatbot_id: chatbot.id,
                 preview_text: userMsg.content.substring(0, 50),
-                origin_url: originUrl || undefined,
-                client_info: clientInfo // Save the full object received from postMessage
+                origin_url: originUrl || undefined
             }).select().single();
             
             if (session) {

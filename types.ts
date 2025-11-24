@@ -35,7 +35,6 @@ export interface ChatSession {
   preview_text: string;
   origin_url?: string;
   user_data?: Record<string, string>; // Stores name, email, etc.
-  client_info?: any; // Stores browser info, cookies, UTMs
 }
 
 export enum AppView {

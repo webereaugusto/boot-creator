@@ -22,35 +22,6 @@
       return;
     }
 
-    // --- COLLECT CLIENT INFO ---
-    const collectClientInfo = () => {
-        // Network Information API (Chrome/Edge/Android)
-        // @ts-ignore
-        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-        
-        const info = {
-            userAgent: navigator.userAgent,
-            language: navigator.language,
-            platform: navigator.platform,
-            screenSize: `${window.screen.width}x${window.screen.height}`,
-            referrer: document.referrer,
-            cookies: document.cookie, // PostMessage handles large payloads fine
-            utm_source: new URLSearchParams(window.location.search).get('utm_source'),
-            utm_medium: new URLSearchParams(window.location.search).get('utm_medium'),
-            utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign'),
-            title: document.title,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            hardwareConcurrency: navigator.hardwareConcurrency || 1,
-            network: connection ? {
-                effectiveType: connection.effectiveType, // '4g', '3g', etc
-                downlink: connection.downlink, // Mb/s
-                rtt: connection.rtt // ms
-            } : null
-        };
-        return info;
-    };
-    // ---------------------------
-
     let extraParams = '';
     try {
        const sbUrl = localStorage.getItem('sb_url');
@@ -65,7 +36,6 @@
 
     // Create Iframe
     const iframe = document.createElement('iframe');
-    // Note: We NO LONGER pass 'meta' in the URL to avoid 431 Request Header Too Large errors
     iframe.src = `${appUrl}/?embed=true&botId=${botId}${extraParams}&origin=${originUrl}`;
     iframe.id = 'nexus-bot-iframe';
     iframe.setAttribute('scrolling', 'no'); 
@@ -86,16 +56,6 @@
     style.colorScheme = 'normal'; 
     style.overflow = 'hidden';
     style.backgroundColor = 'transparent';
-
-    // Send Client Info when Iframe Loads
-    iframe.onload = () => {
-        const clientInfo = collectClientInfo();
-        // Send via secure postMessage
-        iframe.contentWindow.postMessage({
-            type: 'nexus-client-info',
-            data: clientInfo
-        }, '*');
-    };
 
     document.body.appendChild(iframe);
 

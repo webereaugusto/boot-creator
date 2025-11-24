@@ -91,8 +91,7 @@ create table if not exists sessions (
   chatbot_id uuid references chatbots(id) on delete cascade,
   preview_text text,
   origin_url text,
-  user_data jsonb,
-  client_info jsonb
+  user_data jsonb
 );
 
 -- 4. Create Messages Table
