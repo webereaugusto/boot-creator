@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, X, Minus, Bot } from 'lucide-react';
-import { Chatbot, Message } from '../types';
+import { MessageSquare, Send, X, Minus, Bot, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import { Chatbot, Message, Appointment } from '../types';
 import { getSupabase } from '../supabaseClient';
 import { simulateChatResponse } from '../services/geminiService';
 
@@ -17,9 +17,11 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Lead Gen State
+  // Lead Gen & Appointments State
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [leadData, setLeadData] = useState<Record<string, string>>({});
+  const [showAppointments, setShowAppointments] = useState(false);
+  const [userAppointments, setUserAppointments] = useState<Appointment[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const supabase = getSupabase();
@@ -55,6 +57,8 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
                 setMessages(history);
             }
             setShowLeadForm(false);
+            // Fetch appointments for this session
+            fetchUserAppointments(savedSessionId);
         } else {
             // No session, check if lead form is enabled
             if (botData.lead_config?.enabled) {
@@ -68,6 +72,18 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
     };
     init();
   }, [botId, supabase]);
+
+  const fetchUserAppointments = async (sid: string) => {
+      if (!supabase) return;
+      const { data } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('session_id', sid)
+        .eq('status', 'confirmed')
+        .order('start_time', { ascending: true });
+      
+      if (data) setUserAppointments(data);
+  };
 
   // Initial Greeting
   useEffect(() => {
@@ -88,7 +104,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping, isOpen, showLeadForm]);
+  }, [messages, isTyping, isOpen, showLeadForm, showAppointments]);
 
   // Communicate with Parent Window
   useEffect(() => {
@@ -230,8 +246,11 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
                 user_data: leadData || {} // Atribui os dados do lead se houver
             });
 
+            // Atualiza a lista local de agendamentos
+            fetchUserAppointments(currentSessionId);
+
             // Adiciona feedback visual
-            responseText += "\n\n✅ Agendamento confirmado no sistema com sucesso!";
+            responseText += "\n\n✅ Agendamento confirmado no sistema com sucesso! Você pode ver seus horários no ícone de calendário acima.";
         } catch (e) {
             console.error("Falha ao processar agendamento", e);
         }
@@ -294,12 +313,64 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
                 <p className="text-xs text-white/80">Online</p>
             </div>
         </div>
-        <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white transition">
-            <X size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+            {/* Appointment Toggle Button (Only if scheduling is enabled) */}
+            {chatbot.scheduling_config?.enabled && (
+                <button 
+                    onClick={() => setShowAppointments(!showAppointments)} 
+                    className={`p-1.5 rounded-full transition ${showAppointments ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
+                    title="Meus Agendamentos"
+                >
+                    <Calendar size={20} />
+                </button>
+            )}
+            <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white transition">
+                <X size={20} />
+            </button>
+        </div>
       </div>
 
-      {showLeadForm ? (
+      {showAppointments ? (
+          // APPOINTMENTS VIEW
+          <div className="flex-1 bg-zinc-950 p-6 flex flex-col animate-in slide-in-from-right duration-200">
+             <div className="flex items-center justify-between mb-6">
+                <h3 className="text-white font-medium flex items-center gap-2">
+                    <Calendar size={18} className="text-primary"/> Meus Agendamentos
+                </h3>
+                <button onClick={() => setShowAppointments(false)} className="text-xs text-zinc-500 hover:text-white">Voltar ao Chat</button>
+             </div>
+             
+             {userAppointments.length === 0 ? (
+                 <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-center">
+                     <Clock size={32} className="mb-3 opacity-30" />
+                     <p className="text-sm">Você ainda não tem agendamentos confirmados.</p>
+                     <button onClick={() => setShowAppointments(false)} className="mt-4 text-primary text-sm hover:underline">Agendar um horário</button>
+                 </div>
+             ) : (
+                 <div className="space-y-3 overflow-y-auto">
+                     {userAppointments.map((appt) => (
+                         <div key={appt.id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex gap-3">
+                             <div className="mt-1">
+                                 <CheckCircle2 size={16} className="text-green-500" />
+                             </div>
+                             <div>
+                                 <div className="text-white font-medium text-sm">
+                                     {new Date(appt.start_time).toLocaleDateString('pt-BR', {weekday: 'long', day: 'numeric', month: 'long'})}
+                                 </div>
+                                 <div className="text-zinc-400 text-xs mt-1">
+                                     {new Date(appt.start_time).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})} - {new Date(appt.end_time).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
+                                 </div>
+                                 <div className="text-primary text-[10px] mt-2 bg-primary/10 inline-block px-2 py-0.5 rounded border border-primary/20">
+                                     Confirmado
+                                 </div>
+                             </div>
+                         </div>
+                     ))}
+                 </div>
+             )}
+          </div>
+      ) : showLeadForm ? (
+          // LEAD FORM VIEW
           <div className="flex-1 bg-zinc-950 p-8 flex flex-col justify-center animate-in fade-in">
              <div className="text-center mb-6">
                 <h3 className="text-white font-semibold text-lg">Bem-vindo</h3>
@@ -361,6 +432,7 @@ export const StandaloneWidget: React.FC<StandaloneWidgetProps> = ({ botId }) => 
              </form>
           </div>
       ) : (
+        // CHAT VIEW
         <>
             {/* Messages Area */}
             <div className="flex-1 bg-zinc-950/50 p-4 overflow-y-auto space-y-4">
